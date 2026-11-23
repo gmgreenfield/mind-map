@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QDialog,
     QInputDialog,
@@ -25,8 +26,9 @@ NEW_CHAT = "New chat"
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, store: Store, client, parent=None):
+    def __init__(self, store: Store, client, server=None, parent=None):
         super().__init__(parent)
+        self.server = server
         self.setWindowTitle("Mind Map")
         self.resize(1200, 800)
         self.store = store
@@ -70,6 +72,12 @@ class MainWindow(QMainWindow):
         sessions = self.store.sessions()
         self.map.load(sessions)
         self.map.center_on_node(sessions[0].id)
+
+        self._status_timer = QTimer(self)
+        self._status_timer.timeout.connect(self.poll_model_status)
+        if server is not None:
+            self.poll_model_status()
+            self._status_timer.start(1000)
 
     # --- view state ---------------------------------------------------------
     def in_chat(self) -> bool:
@@ -329,7 +337,33 @@ class MainWindow(QMainWindow):
     def idle(self) -> bool:
         return not self.workers and not self._background
 
+    def set_model_status(self, kind: str, text: str) -> None:
+        colors = {"ready": "#3a9d5d", "busy": "#e0a030", "error": "#d9534f", "info": "#8a8f98"}
+        html_text = f'<span style="color:{colors[kind]}">●</span>&nbsp;{text}' if text else ""
+        self.model_status = (kind, text)
+        self.map.set_model_status(html_text)
+        self.chat.set_model_status(html_text)
+
+    def poll_model_status(self) -> None:
+        state = self.server.health()
+        if state == "ready":
+            self.set_model_status("ready", "Qwen ready")
+            self._status_timer.setInterval(5000)
+            return
+        self._status_timer.setInterval(1000)
+        if state == "loading":
+            self.set_model_status("busy", "Loading Qwen…")
+        elif getattr(self.server, "missing", False):
+            self.set_model_status("error", "llama-server not found")
+        elif self.server.ours() and self.server.exited() is not None:
+            self.set_model_status("error", "Qwen stopped — see ~/Library/Logs/MindMap")
+        elif self.server.ours():
+            self.set_model_status("busy", "Starting Qwen…")
+        else:
+            self.set_model_status("error", "Qwen offline")
+
     def closeEvent(self, event) -> None:
+        self._status_timer.stop()
         for w in [*self.workers.values(), *self._background]:
             w.stop()
             w.wait(2000)

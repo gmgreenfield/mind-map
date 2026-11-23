@@ -187,6 +187,13 @@ class MapView(QGraphicsView):
         )
         self.hint.adjustSize()
 
+        self.model_status = QLabel(self)
+        self.model_status.setTextFormat(Qt.RichText)
+        self.model_status.setStyleSheet(
+            f"color: {self.theme.subtext.name()}; background: transparent; font-size: 12px;"
+        )
+        self.model_status.hide()
+
     # --- model -------------------------------------------------------------
     def load(self, sessions: list[Session]) -> None:
         self._scene.clear()
@@ -386,3 +393,13 @@ class MapView(QGraphicsView):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self.hint.move(16, self.viewport().height() - self.hint.height() - 12)
+        self._place_status()
+
+    def set_model_status(self, html_text: str) -> None:
+        self.model_status.setText(html_text)
+        self.model_status.adjustSize()
+        self.model_status.setVisible(bool(html_text))
+        self._place_status()
+
+    def _place_status(self) -> None:
+        self.model_status.move(self.viewport().width() - self.model_status.width() - 16, 12)

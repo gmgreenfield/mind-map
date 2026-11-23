@@ -313,6 +313,11 @@ class ChatView(QWidget):
         top.setSpacing(10)
         top.addWidget(self.map_btn)
         top.addWidget(self.crumbs, 1)
+        self.model_status = QLabel()
+        self.model_status.setObjectName("subtle")
+        self.model_status.setTextFormat(Qt.RichText)
+        self.model_status.hide()
+        top.addWidget(self.model_status)
         top.addWidget(self.menu_btn)
         top.addWidget(self.branch_btn)
 
@@ -461,6 +466,10 @@ class ChatView(QWidget):
         return "\n\n".join(parts)
 
     # --- misc ---------------------------------------------------------------------
+    def set_model_status(self, html_text: str) -> None:
+        self.model_status.setText(html_text)
+        self.model_status.setVisible(bool(html_text))
+
     def clear_input(self) -> None:
         self.input.clear()
 

@@ -285,3 +285,55 @@ def test_rename_from_chat_menu(setup):
     w.ask_text = lambda *a: ("From menu", True)
     w.chat.rename_action.trigger()
     assert store.get_session(root.id).title == "From menu"
+
+
+# --- model status ----------------------------------------------------------------
+class FakeServer:
+    def __init__(self, state="down", ours=True, exited=None, missing=False):
+        self.state, self._ours, self._exited, self.missing = state, ours, exited, missing
+
+    def health(self):
+        return self.state
+
+    def ours(self):
+        return self._ours
+
+    def exited(self):
+        return self._exited
+
+
+@pytest.mark.parametrize(
+    "server,kind,text",
+    [
+        (FakeServer("ready"), "ready", "Qwen ready"),
+        (FakeServer("loading"), "busy", "Loading Qwen…"),
+        (FakeServer("down"), "busy", "Starting Qwen…"),
+        (FakeServer("down", exited=1), "error", "Qwen stopped"),
+        (FakeServer("down", ours=False), "error", "Qwen offline"),
+        (FakeServer("down", ours=False, missing=True), "error", "llama-server not found"),
+    ],
+)
+def test_model_status(qtbot, server, kind, text):
+    store = Store()
+    w = MainWindow(store, FakeClient(), server)
+    qtbot.addWidget(w)
+    assert w.model_status[0] == kind and w.model_status[1].startswith(text)
+    assert text in w.map.model_status.text() and text in w.chat.model_status.text()
+    w.close()
+    store.close()
+
+
+def test_status_poll_switches_to_ready(qtbot):
+    store = Store()
+    server = FakeServer("loading")
+    w = MainWindow(store, FakeClient(), server)
+    qtbot.addWidget(w)
+    server.state = "ready"
+    qtbot.waitUntil(lambda: w.model_status[1] == "Qwen ready", timeout=3000)
+    w.close()
+    store.close()
+
+
+def test_no_server_means_no_status(setup):
+    w, _, _ = setup
+    assert w.map.model_status.isHidden()

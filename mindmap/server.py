@@ -71,6 +71,7 @@ class ModelServer:
         self.binary = binary
         self.log_path = log_dir / "llama-server.log"
         self.proc: subprocess.Popen | None = None
+        self.missing = False  # no llama-server binary found
         self.http = httpx.Client(
             base_url=f"http://127.0.0.1:{port}", timeout=httpx.Timeout(0.5), transport=transport
         )
@@ -113,6 +114,7 @@ class ModelServer:
             return "external"
         binary = self.binary or find_binary()
         if binary is None:
+            self.missing = True
             return "missing"
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         log = open(self.log_path, "ab")
