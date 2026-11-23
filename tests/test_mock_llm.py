@@ -1,5 +1,12 @@
 from mindmap import branching
-from mindmap.mock_llm import GENERIC, MockLLMClient, make_brief, make_reply, tokenize
+from mindmap.mock_llm import (
+    GENERIC,
+    MockLLMClient,
+    make_brief,
+    make_reply,
+    parse_brief_request,
+    tokenize,
+)
 from mindmap.store import Message
 
 
@@ -46,6 +53,18 @@ def test_nested_brief_carries_parent_goal():
     )
     brief = MockLLMClient(delay=0).complete(req)
     assert "Parent session's goal: Explore naming in depth." in brief
+
+
+def test_parse_brief_request_round_trips_multiline_messages():
+    history = [
+        Message(1, 1, "user", "line one\n\nstill the user"),
+        Message(2, 1, "assistant", "answer"),
+    ]
+    req = branching.brief_request("## Goal\nParent goal.\n", history, "topic x")
+    topic, convo, goal = parse_brief_request(req[-1]["content"])
+    assert topic == "topic x"
+    assert convo == [("user", "line one\n\nstill the user"), ("assistant", "answer")]
+    assert goal == "Parent goal."
 
 
 def test_empty_parent_brief():

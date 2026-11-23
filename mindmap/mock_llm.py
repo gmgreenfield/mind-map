@@ -97,14 +97,29 @@ def _goal_from_system(system: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
-def make_brief(topic: str, history: list[dict]) -> str:
-    convo = [m for m in history if m["role"] in ("user", "assistant")]
+def parse_brief_request(content: str) -> tuple[str, list[tuple[str, str]], str | None]:
+    """Pull (topic, [(role, text)], parent_goal) out of a brief request."""
+    m = re.search(r"focused on: (.+)", content)
+    topic = m.group(1).strip() if m else "the new topic"
+    t = re.search(r"TRANSCRIPT:\n<<<\n(.*?)\n>>>", content, re.S)
+    convo: list[tuple[str, str]] = []
+    if t:
+        for chunk in re.split(r"\n\n(?=(?:USER|ASSISTANT): )", t.group(1)):
+            role, _, text = chunk.partition(": ")
+            if role in ("USER", "ASSISTANT"):
+                convo.append(("user" if role == "USER" else "assistant", text))
+    bg = re.search(r"BACKGROUND[^\n]*\n(.*?)\n\nTRANSCRIPT:", content, re.S)
+    goal = _goal_from_system(bg.group(1)) if bg else None
+    return topic, convo, goal
+
+
+def make_brief(
+    topic: str, convo: list[tuple[str, str]], parent_goal: str | None = None
+) -> str:
     facts = [
-        f"- {'User' if m['role'] == 'user' else 'Assistant'}: {_first_sentence(m['content'])}"
-        for m in convo[-4:]
+        f"- {'User' if role == 'user' else 'Assistant'}: {_first_sentence(text)}"
+        for role, text in convo[-4:]
     ] or ["- (The parent conversation was empty.)"]
-    system = history[0]["content"] if history and history[0]["role"] == "system" else ""
-    parent_goal = _goal_from_system(system)
     if parent_goal:
         facts.insert(0, f"- Parent session's goal: {parent_goal}")
     return (
@@ -143,9 +158,7 @@ class MockLLMClient:
         self.calls.append(messages)
         last = messages[-1]["content"] if messages else ""
         if _BRIEF_MARKER in last:
-            m = re.search(r"focused on: (.+)", last)
-            topic = m.group(1).strip() if m else "the new topic"
-            text = make_brief(topic, messages[:-1])
+            text = make_brief(*parse_brief_request(last))
         else:
             text = make_reply(messages)
         for tok in tokenize(text):

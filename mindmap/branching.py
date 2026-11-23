@@ -12,17 +12,26 @@ BASE_SYSTEM = (
     "new nodes."
 )
 
+BRIEF_SYSTEM = (
+    "You write handoff briefs that summarise conversations accurately. "
+    "Never invent facts or reverse conclusions."
+)
+
 BRIEF_INSTRUCTIONS = (
-    "The user wants to branch this conversation into a NEW, separate chat "
+    "The user wants to branch the transcript above into a NEW, separate chat "
     "session focused on: {topic}\n\n"
     "Write a handoff brief for that new session. The new session will see "
-    "ONLY this brief, not the conversation above. Include:\n"
+    "ONLY this brief, not the transcript. Include:\n"
     "- Goal: one sentence on what the new session should explore.\n"
-    "- Context: the facts, decisions, constraints and terminology from this "
-    "conversation that matter for that topic. Leave out anything unrelated.\n"
-    "- Open questions: what is still undecided about the topic.\n\n"
-    "Write it as plain Markdown with those three headings. Be specific and "
-    "brief (under 250 words). Output only the brief."
+    "- Context: facts, decisions and constraints that were actually stated "
+    "in the transcript and matter for that topic. Include conclusions "
+    "already reached (e.g. which option was preferred). Do NOT add facts, "
+    "names, numbers or assumptions that were not said. Leave out anything "
+    "unrelated.\n"
+    "- Open questions: at most 4 short questions still undecided about "
+    "the topic.\n\n"
+    "Use the headings '## Goal', '## Context' and '## Open questions'. "
+    "Keep it under 150 words. Output only the brief."
 )
 
 # Characters, not tokens: ~4 chars/token keeps us well inside an 8k context.
@@ -69,12 +78,26 @@ def brief_request(
     topic: str,
     max_chars: int = DEFAULT_HISTORY_CHARS,
 ) -> list[dict]:
-    """Messages asking the model to write a handoff brief for a new branch."""
-    msgs = chat_context(brief, history, max_chars)
-    msgs.append(
-        {"role": "user", "content": BRIEF_INSTRUCTIONS.format(topic=topic.strip())}
-    )
-    return msgs
+    """Messages asking the model to write a handoff brief for a new branch.
+
+    The conversation is passed as a quoted transcript in one message rather
+    than as chat turns: Qwen3-4B summarised chat turns unreliably (it
+    reversed a stated conclusion in 4/4 runs) but got it right 3/3 times
+    from a transcript.
+    """
+    lines = [
+        f"{'USER' if m.role == 'user' else 'ASSISTANT'}: {m.content}"
+        for m in trim_history(history, max_chars)
+    ]
+    parts = []
+    if brief:
+        parts.append(f"BACKGROUND (the brief this conversation started from):\n{brief}")
+    parts.append("TRANSCRIPT:\n<<<\n" + ("\n\n".join(lines) or "(empty)") + "\n>>>")
+    parts.append(BRIEF_INSTRUCTIONS.format(topic=topic.strip()))
+    return [
+        {"role": "system", "content": BRIEF_SYSTEM},
+        {"role": "user", "content": "\n\n".join(parts)},
+    ]
 
 
 def title_from_text(text: str, limit: int = 40) -> str:

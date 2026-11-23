@@ -41,13 +41,34 @@ def test_chat_context_shape():
     ]
 
 
-def test_brief_request_appends_instruction_with_topic():
-    history = [msg(1, "user", "we are building a mind map app")]
+def test_brief_request_sends_transcript_in_one_message():
+    history = [
+        msg(1, "user", "we are building a mind map app"),
+        msg(2, "assistant", "sounds good"),
+    ]
     ctx = brief_request(None, history, "  idea describing this project ")
-    assert ctx[-1]["role"] == "user"
-    assert "idea describing this project" in ctx[-1]["content"]
-    assert "ONLY this brief" in ctx[-1]["content"]
-    assert ctx[1]["content"] == "we are building a mind map app"
+    assert [m["role"] for m in ctx] == ["system", "user"]
+    body = ctx[1]["content"]
+    assert "TRANSCRIPT:\n<<<\nUSER: we are building a mind map app\n\nASSISTANT: sounds good\n>>>" in body
+    assert "focused on: idea describing this project" in body
+    assert "ONLY this brief" in body
+    assert "BACKGROUND" not in body
+
+
+def test_brief_request_includes_parent_brief_as_background():
+    ctx = brief_request("## Goal\nExplore X.", [msg(1, "user", "hi")], "y")
+    body = ctx[1]["content"]
+    assert body.index("BACKGROUND") < body.index("## Goal\nExplore X.") < body.index("TRANSCRIPT")
+
+
+def test_brief_request_trims_long_history():
+    history = [msg(i, "user" if i % 2 else "assistant", f"m{i} " + "x" * 100) for i in range(1, 50)]
+    body = brief_request(None, history, "t", max_chars=500)[1]["content"]
+    assert "m49 " in body and "m1 " not in body
+
+
+def test_brief_request_empty_history():
+    assert "<<<\n(empty)\n>>>" in brief_request(None, [], "t")[1]["content"]
 
 
 def test_title_from_text():
