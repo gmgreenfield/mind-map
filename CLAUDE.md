@@ -47,6 +47,8 @@ Keep context small (server ctx 8192).
 
 ## Conventions
 - Atomic git commits, one logical change each.
+- **Never** add "Co-Authored-By: Claude" or any Claude/AI attribution to
+  commits, PRs, or files.
 - Every logic module has tests; UI gets offscreen smoke tests.
 - Keep this file updated with state and decisions.
 
