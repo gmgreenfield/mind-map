@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from .llm import DEFAULT_BASE_URL, LLMClient
+from .providers import ModelRouter
 from .server import ModelServer
 from .store import Store
 from .ui.main_window import MainWindow
@@ -54,12 +55,14 @@ def open_store(args: argparse.Namespace) -> Store:
     return store
 
 
-def make_client(args: argparse.Namespace):
+def make_client(args: argparse.Namespace, server: ModelServer | None = None):
+    """The mock serves every model; otherwise a router picks local, Claude or ChatGPT."""
     if args.mock:
         from .mock_llm import MockLLMClient
 
         return MockLLMClient(delay=args.mock_delay)
-    return LLMClient(os.environ.get("MINDMAP_LLM_URL", DEFAULT_BASE_URL))
+    local = LLMClient(os.environ.get("MINDMAP_LLM_URL", DEFAULT_BASE_URL))
+    return ModelRouter(local, server)
 
 
 def make_server(args: argparse.Namespace) -> ModelServer | None:
@@ -76,8 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     app = QApplication(sys.argv[:1])
     app.setApplicationName("Mind Map")
     store = open_store(args)
-    client = make_client(args)
     server = make_server(args)
+    client = make_client(args, server)
     try:
         window = MainWindow(store, client, server)
         if args.mock:

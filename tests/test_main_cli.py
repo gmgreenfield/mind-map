@@ -1,6 +1,7 @@
 from mindmap.__main__ import data_path, make_client, open_store, parse_args
 from mindmap.llm import LLMClient
 from mindmap.mock_llm import MockLLMClient
+from mindmap.providers import ModelRouter
 
 
 def test_flags():
@@ -20,7 +21,7 @@ def test_client_choice():
     mock = make_client(parse_args(["--mock", "--mock-delay", "0"]))
     assert isinstance(mock, MockLLMClient) and mock.delay == 0
     real = make_client(parse_args([]))
-    assert isinstance(real, LLMClient)
+    assert isinstance(real, ModelRouter) and isinstance(real.llm, LLMClient)
     real.close()
 
 

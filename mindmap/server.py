@@ -18,8 +18,10 @@ from pathlib import Path
 import httpx
 
 from .llm import LLMError
+from .models import DEFAULT_MODEL as _DEFAULT_SPEC
 
-DEFAULT_MODEL = "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M"
+DEFAULT_MODEL = _DEFAULT_SPEC.name
+
 DEFAULT_PORT = 8080
 LOG_DIR = Path.home() / "Library" / "Logs" / "MindMap"
 
