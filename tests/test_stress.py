@@ -1,5 +1,6 @@
 """End-to-end stress tests: the real MainWindow driven with the mock Qwen."""
 
+import html
 import math
 import random
 
@@ -18,6 +19,8 @@ def make_window(qtbot, store, client):
     w.map.animation_ms = 0
     w.brief_dialog_factory = FakeBriefDialog
     FakeBriefDialog.accept = True
+    w.confirm = lambda *a: True
+    w.ask_text = lambda title, label, text: (text + " (renamed)", True)
     w.resize(1100, 750)
     qtbot.addWidget(w)
     return w
@@ -65,7 +68,7 @@ def check_invariants(w, store):
     # The chat view shows the right session.
     if w.in_chat():
         crumbs = w.chat.crumbs.text()
-        assert store.get_session(w.current_id).title.replace("&", "&amp;") in crumbs
+        assert html.escape(store.get_session(w.current_id).title) in crumbs
 
 
 def test_demo_map_renders(app):
@@ -214,11 +217,18 @@ def test_random_walk(qtbot, seed_value):
                "tell me more", "how would the code work?", "naming ideas?"]
 
     def ensure_chat():
+        if not store.sessions():
+            w.create_root(0, 0)
         if not w.in_chat():
             w.open_session(w.current_id or rng.choice(store.sessions()).id)
 
+    def any_session():
+        if not store.sessions():
+            w.create_root(0, 0)
+        return rng.choice(store.sessions())
+
     actions = {
-        "open": lambda: w.open_session(rng.choice(store.sessions()).id),
+        "open": lambda: w.open_session(any_session().id),
         "send": lambda: (ensure_chat(), w.handle_input(rng.choice(prompts)), wait_idle(qtbot, w)),
         "branch": lambda: (ensure_chat(), w.handle_input(f"/branch topic {rng.randint(0, 999)}")),
         "parent": lambda: (ensure_chat(), w.handle_input("/parent")),
@@ -228,21 +238,33 @@ def test_random_walk(qtbot, seed_value):
         "drag": lambda: _drag(w, store, rng),
         "new_root": lambda: w.create_root(rng.uniform(-3000, 3000), rng.uniform(-3000, 3000)),
         "bad_command": lambda: (ensure_chat(), w.handle_input("/nonsense")),
+        "rename": lambda: w.rename_session(any_session().id),
+        "delete_leaf": lambda: _delete_leaf(w, store, rng),
+        "delete_any": lambda: w.delete_session(any_session().id),
     }
     weights = {"open": 3, "send": 5, "branch": 4, "parent": 2, "navigate": 4,
-               "crumb": 2, "map": 2, "drag": 3, "new_root": 1, "bad_command": 1}
+               "crumb": 2, "map": 2, "drag": 3, "new_root": 1, "bad_command": 1,
+               "rename": 2, "delete_leaf": 2, "delete_any": 1}
     names = list(weights)
     for _ in range(150):
         name = rng.choices(names, weights=[weights[n] for n in names])[0]
         actions[name]()
         check_invariants(w, store)
     wait_idle(qtbot, w)
-    assert len(store.sessions()) > 13
+    check_invariants(w, store)
     w.close()
     store.close()
 
 
+def _delete_leaf(w, store, rng):
+    leaves = [s for s in store.sessions() if not store.children(s.id)]
+    if leaves:
+        w.delete_session(rng.choice(leaves).id)
+
+
 def _drag(w, store, rng):
+    if not store.sessions():
+        return
     s = rng.choice(store.sessions())
     subtree = rng.random() < 0.7
     w.map.drag_nodes(s.id, rng.uniform(-200, 200), rng.uniform(-200, 200), subtree)
