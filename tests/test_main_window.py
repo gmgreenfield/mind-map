@@ -67,7 +67,7 @@ def test_send_streams_reply_and_titles_session(setup, qtbot):
     ]
     assert store.get_session(root.id).title == "Plan a mind map app"
     assert client.calls[0][0]["role"] == "system"
-    assert "Hi there" in w.chat.transcript.toPlainText()
+    assert "Hi there" in w.chat.transcript_text()
 
 
 def test_failed_reply_keeps_partial_and_shows_error(setup, qtbot):

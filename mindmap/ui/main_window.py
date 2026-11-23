@@ -10,6 +10,7 @@ from ..layout import Point, nearest_in_direction, place_child
 from ..store import Session, Store
 from .brief_dialog import BriefDialog
 from .chat_view import ChatView
+from . import style
 from .map_view import MapView
 from .worker import StreamWorker
 
@@ -35,6 +36,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.map)
         self.stack.addWidget(self.chat)
         self.setCentralWidget(self.stack)
+        self.setStyleSheet(style.stylesheet(style.current()))
 
         self.map.nodeActivated.connect(self.open_session)
         self.map.nodesMoved.connect(self._persist_positions)
