@@ -88,5 +88,9 @@ Keep context small (server ctx 8192).
 - [x] llama.cpp b12648 prebuilt (macOS x64, CPU) in `~/.local/llama.cpp/current`
   — Homebrew abandoned: no Intel bottles on macOS 26, built everything from source
 - [x] Model downloaded; real Qwen streams ~8–9 words/s, first token ~0.3 s
-- [ ] Try branching with the real model and tune the brief prompt
+- [x] Real end-to-end branching works (parent chat → /branch → child chat).
+  Brief ~16–25 s, normal replies 8–20 s; long unprompted replies can take 90 s.
+- Brief prompt sends the parent chat as a quoted TRANSCRIPT in one message —
+  as chat turns, Qwen3-4B reversed stated conclusions (see commit 3fda70d).
+- [ ] Consider capping reply length (max_tokens / stronger "concise" prompt)
 - [ ] Not yet: deleting/renaming nodes from the map, packaging as .app
