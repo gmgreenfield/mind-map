@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..store import Session
+from . import style
 
 NODE_W, NODE_H = 200.0, 64.0
 MIN_SCALE, MAX_SCALE = 0.15, 3.0
@@ -34,25 +35,19 @@ def is_dark(widget) -> bool:
 
 
 class Theme:
+    """QColor view of the shared palette, for painting."""
+
     def __init__(self, dark: bool):
-        if dark:
-            self.bg = QColor("#1b1c1f")
-            self.grid = QColor("#26282c")
-            self.node = QColor("#2c2f35")
-            self.node_border = QColor("#4a4f58")
-            self.text = QColor("#e8e8ea")
-            self.subtext = QColor("#9a9ea6")
-            self.edge = QColor("#5a606b")
-        else:
-            self.bg = QColor("#f6f6f4")
-            self.grid = QColor("#e8e8e4")
-            self.node = QColor("#ffffff")
-            self.node_border = QColor("#c9cbd0")
-            self.text = QColor("#1d1f23")
-            self.subtext = QColor("#70747c")
-            self.edge = QColor("#b4b8bf")
-        self.accent = QColor("#3d7bfd")
-        self.busy = QColor("#e0a030")
+        p = style.DARK if dark else style.LIGHT
+        self.bg = QColor(p.bg)
+        self.grid = QColor(p.grid)
+        self.node = QColor(p.surface if not dark else p.assistant_bubble)
+        self.node_border = QColor(p.node_border)
+        self.text = QColor(p.text)
+        self.subtext = QColor(p.subtext)
+        self.edge = QColor(p.edge)
+        self.accent = QColor(p.accent)
+        self.busy = QColor(p.busy)
 
 
 class NodeItem(QGraphicsObject):
