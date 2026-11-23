@@ -170,3 +170,11 @@ def test_inline_code_uses_a_real_monospace_font():
 
     html = md_to_html("Call `log()` now")
     assert "Menlo" in html and "'monospace'" not in html
+
+
+def test_model_chip(qtbot):
+    v = make(qtbot)
+    v.set_model_label("Claude Opus 5.5", cloud=True)
+    assert v.model_btn.text().startswith("☁") and "Claude Opus 5.5" in v.model_btn.text()
+    with qtbot.waitSignal(v.modelRequested):
+        v.model_btn.click()

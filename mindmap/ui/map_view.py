@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 
+from ..models import ModelSpec
 from ..store import Session
 from . import style
 
@@ -58,6 +59,7 @@ class NodeItem(QGraphicsObject):
         self.parent_id = session.parent_id
         self.title = session.title
         self.is_branch = session.brief is not None
+        self.model_label = ModelSpec.parse(session.model).label
         self.view = view
         self.current = False
         self.busy = False
@@ -94,7 +96,9 @@ class NodeItem(QGraphicsObject):
         f.setWeight(QFont.Normal)
         painter.setFont(f)
         painter.setPen(t.subtext)
-        sub = "thinking…" if self.busy else ("branch" if self.is_branch else "root")
+        kind = "branch" if self.is_branch else "root"
+        sub = "thinking…" if self.busy else f"{kind} · {self.model_label}"
+        sub = painter.fontMetrics().elidedText(sub, Qt.ElideRight, int(text_rect.width()))
         painter.drawText(rect.adjusted(14, 34, -14, -8), Qt.AlignLeft | Qt.AlignVCenter, sub)
 
     # --- interaction ----------------------------------------------------
@@ -230,6 +234,11 @@ class MapView(QGraphicsView):
             node = self.nodes.pop(sid, None)
             if node is not None:
                 self._scene.removeItem(node)
+
+    def set_model_label(self, session_id: int, label: str) -> None:
+        node = self.nodes[session_id]
+        node.model_label = label
+        node.update()
 
     def set_title(self, session_id: int, title: str) -> None:
         node = self.nodes[session_id]

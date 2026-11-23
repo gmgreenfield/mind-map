@@ -281,6 +281,7 @@ class ChatView(QWidget):
     sessionRequested = Signal(int)
     navigateRequested = Signal(str)
     renameRequested = Signal()
+    modelRequested = Signal()
     deleteRequested = Signal()
 
     def __init__(self, parent=None):
@@ -313,6 +314,11 @@ class ChatView(QWidget):
         top.setSpacing(10)
         top.addWidget(self.map_btn)
         top.addWidget(self.crumbs, 1)
+        self.model_btn = QPushButton()
+        self.model_btn.setObjectName("modelChip")
+        self.model_btn.setToolTip("Change the model for this chat")
+        self.model_btn.clicked.connect(self.modelRequested)
+        top.addWidget(self.model_btn)
         self.model_status = QLabel()
         self.model_status.setObjectName("subtle")
         self.model_status.setTextFormat(Qt.RichText)
@@ -466,6 +472,9 @@ class ChatView(QWidget):
         return "\n\n".join(parts)
 
     # --- misc ---------------------------------------------------------------------
+    def set_model_label(self, label: str, cloud: bool) -> None:
+        self.model_btn.setText(f"{'☁  ' if cloud else ''}{label}  ▾")
+
     def set_model_status(self, html_text: str) -> None:
         self.model_status.setText(html_text)
         self.model_status.setVisible(bool(html_text))

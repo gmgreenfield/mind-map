@@ -102,6 +102,12 @@ def stylesheet(p: Palette) -> str:
     }}
     QPushButton#accentButton:disabled {{ background: {p.border}; color: {p.subtext}; }}
     QToolButton#menuButton::menu-indicator {{ image: none; }}
+    QPushButton#modelChip {{
+        border-radius: 12px;
+        padding: 4px 12px;
+        color: {p.subtext};
+        font-size: 12px;
+    }}
 
     QScrollArea {{ border: none; background: {p.bg}; }}
     QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
