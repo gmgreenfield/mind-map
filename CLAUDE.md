@@ -41,7 +41,7 @@ Keep context small (server ctx 8192).
 
 ## Commands
 - Setup: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
-- Model server: `scripts/serve.sh` (first run downloads ~2.5 GB to `~/Library/Caches/llama.cpp`)
+- Model server: `scripts/serve.sh` (first run downloads ~2.5 GB to `~/.cache/huggingface/hub`)
 - App: `.venv/bin/python -m mindmap`
 - **App without a model:** `.venv/bin/python -m mindmap --mock --demo`
   (`--reset-demo` re-seeds; demo uses `demo.db`, never the real `mindmap.db`)
