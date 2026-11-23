@@ -13,6 +13,7 @@ from .llm import DEFAULT_BASE_URL, LLMClient
 from .providers import ModelRouter
 from .server import ModelServer
 from .store import Store
+from .ui import gc_guard
 from .ui.main_window import MainWindow
 
 APP_DIR = Path.home() / "Library" / "Application Support" / "MindMap"
@@ -104,6 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         return self_check()
     app = QApplication(sys.argv[:1])
     app.setApplicationName("Mind Map")
+    gc_guard.install(app)
     store = open_store(args)
     server = make_server(args)
     client = make_client(args, server)
