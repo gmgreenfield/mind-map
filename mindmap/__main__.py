@@ -28,6 +28,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                    help="wipe and re-seed the demo map (implies --demo)")
     p.add_argument("--no-server", action="store_true",
                    help="don't start llama-server; only use one that is already running")
+    p.add_argument("--self-check", action="store_true",
+                   help="check the cloud SDKs, Keychain and llama-server are usable, then exit")
     p.add_argument("--mock-delay", type=float, default=0.03,
                    help="seconds between mock tokens (default 0.03)")
     args = p.parse_args(argv)
@@ -74,8 +76,32 @@ def make_server(args: argparse.Namespace) -> ModelServer | None:
     return server
 
 
+def self_check() -> int:
+    """Used by the release build to catch packaging gaps (e.g. a missing backend)."""
+    import anthropic
+    import keyring
+    import openai
+
+    from .server import find_binary
+
+    backend = keyring.get_keyring()
+    checks = {
+        "anthropic SDK": anthropic.__version__,
+        "openai SDK": openai.__version__,
+        "keyring backend": type(backend).__module__ + "." + type(backend).__name__,
+        "llama-server": str(find_binary() or "missing"),
+    }
+    for name, value in checks.items():
+        print(f"{name}: {value}")
+    ok = "fail" not in checks["keyring backend"].lower() and checks["llama-server"] != "missing"
+    print("OK" if ok else "FAILED")
+    return 0 if ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    if args.self_check:
+        return self_check()
     app = QApplication(sys.argv[:1])
     app.setApplicationName("Mind Map")
     store = open_store(args)

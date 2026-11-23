@@ -62,3 +62,12 @@ def test_make_server(monkeypatch):
     s = m.make_server(parse_args([]))
     assert started == [1]
     s.close()
+
+
+def test_self_check_runs(capsys):
+    from mindmap import __main__ as m
+
+    code = m.main(["--self-check"])
+    out = capsys.readouterr().out
+    assert "anthropic SDK:" in out and "keyring backend:" in out
+    assert code in (0, 1)
