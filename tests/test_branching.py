@@ -6,6 +6,7 @@ from mindmap.branching import (
     title_from_text,
     trim_history,
 )
+from mindmap.llm import TRUNCATION_NOTE
 from mindmap.store import Message
 
 
@@ -39,6 +40,16 @@ def test_chat_context_shape():
         {"role": "user", "content": "hi"},
         {"role": "assistant", "content": "hello"},
     ]
+
+
+def test_chat_context_strips_truncation_note():
+    history = [msg(1, "assistant", "long answer" + TRUNCATION_NOTE), msg(2, "user", "continue")]
+    ctx = chat_context(None, history)
+    assert ctx[1]["content"] == "long answer"
+
+
+def test_system_prompt_asks_for_brevity():
+    assert "brief" in BASE_SYSTEM and "No emoji" in BASE_SYSTEM
 
 
 def test_brief_request_sends_transcript_in_one_message():

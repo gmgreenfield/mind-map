@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from .llm import TRUNCATION_NOTE
 from .store import Message
 
 BASE_SYSTEM = (
-    "You are a helpful, concise assistant inside a mind-map chat app. "
-    "Each conversation is one node on a map; users branch side topics into "
-    "new nodes."
+    "You are a helpful assistant inside a mind-map chat app. Each "
+    "conversation is one node on a map; side topics get branched into new "
+    "nodes, so stay on this node's topic.\n\n"
+    "Style: be brief. Answer in at most 3 short paragraphs, or a list of at "
+    "most 6 short items, unless the user asks for more detail. No emoji. No "
+    "filler openings like 'Great question' and no closing offers to help "
+    "further. If you are not sure of a fact, say so instead of guessing."
 )
 
 BRIEF_SYSTEM = (
@@ -68,7 +73,10 @@ def chat_context(
 ) -> list[dict]:
     """Messages to send for a normal chat turn in a session."""
     msgs = [{"role": "system", "content": system_prompt(brief)}]
-    msgs += [{"role": m.role, "content": m.content} for m in trim_history(history, max_chars)]
+    msgs += [
+        {"role": m.role, "content": m.content.replace(TRUNCATION_NOTE.strip(), "").strip()}
+        for m in trim_history(history, max_chars)
+    ]
     return msgs
 
 
