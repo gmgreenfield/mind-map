@@ -9,6 +9,8 @@ class FakeBriefDialog:
 
     accept = True
     title_override = None
+    timeout_ms = 2000
+    brief_override = None
 
     def __init__(self, topic, parent=None):
         self.topic = topic
@@ -28,12 +30,12 @@ class FakeBriefDialog:
 
     def exec(self):
         if not self._done:
-            QTimer.singleShot(2000, self._loop.quit)
+            QTimer.singleShot(self.timeout_ms, self._loop.quit)
             self._loop.exec()
         return QDialog.Accepted if self.accept else QDialog.Rejected
 
     def brief(self):
-        return self.text
+        return self.text if self.brief_override is None else self.brief_override
 
     def title(self):
         return self.title_override or self.topic

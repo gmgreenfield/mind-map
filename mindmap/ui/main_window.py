@@ -225,7 +225,11 @@ class MainWindow(QMainWindow):
             worker.stop()
         if not accepted:
             return None
-        return self.create_branch(parent.id, dialog.title() or topic, dialog.brief())
+        brief = dialog.brief().strip()
+        if not brief:
+            self.chat.flash("Branch not created: the handoff brief was empty.")
+            return None
+        return self.create_branch(parent.id, dialog.title() or topic, brief)
 
     def _track(self, worker: StreamWorker) -> None:
         """Hold a reference until the thread has fully stopped.

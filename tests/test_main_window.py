@@ -27,6 +27,7 @@ def setup(qtbot):
     w.map.animation_ms = 0
     w.brief_dialog_factory = FakeBriefDialog
     FakeBriefDialog.accept = True
+    FakeBriefDialog.brief_override = None
     qtbot.addWidget(w)
     w.resize(1000, 700)
     yield w, store, client
@@ -171,3 +172,15 @@ def test_double_click_creates_new_root(setup):
     s = w.create_root(500, 500)
     assert s.parent_id is None and (s.x, s.y) == (500, 500)
     assert w.current_id == s.id and w.in_chat()
+
+
+def test_empty_brief_does_not_create_branch(setup):
+    w, store, _ = setup
+    w.open_session(store.sessions()[0].id)
+    FakeBriefDialog.brief_override = "   "
+    try:
+        assert w.start_branch("topic") is None
+    finally:
+        FakeBriefDialog.brief_override = None
+    assert len(store.sessions()) == 1
+    assert "empty" in w.chat.status.text()
