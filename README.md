@@ -11,6 +11,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/gmgreenfield/mind-map/actions/workflows/tests.yml"><img src="https://github.com/gmgreenfield/mind-map/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="https://github.com/gmgreenfield/mind-map/releases/latest"><img src="https://img.shields.io/github/v/release/gmgreenfield/mind-map" alt="latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+</p>
+
+<p align="center">
   <img src="docs/demo.gif" alt="Demo: chatting, branching a side topic with a handoff brief, and the map growing" width="860">
 </p>
 
@@ -44,8 +50,9 @@ It runs on the CPU, so Intel Macs work (tested on an Intel i7 with macOS 26). Ap
 
 ### Download the app
 
-Grab `Mind-Map.zip` from [Releases](../../releases) (the current build is for Intel Macs),
-unzip it and move **Mind Map.app** to Applications.
+From the [latest release](https://github.com/gmgreenfield/mind-map/releases/latest), download
+`Mind-Map-macOS-arm64.zip` (Apple Silicon) or `Mind-Map-macOS-x64.zip` (Intel), unzip it
+and move **Mind Map.app** to Applications.
 
 The app isn't signed by Apple, so the first time, **right-click it → Open → Open**.
 On first launch it downloads the model (~2.5 GB) and then starts in a few seconds after that.
