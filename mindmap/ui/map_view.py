@@ -8,6 +8,7 @@ from collections.abc import Callable
 from PySide6.QtCore import (
     QEasingCurve,
     QEvent,
+    QPoint,
     QPointF,
     QRectF,
     Qt,
@@ -116,6 +117,10 @@ class NodeItem(QGraphicsObject):
         self._last = event.scenePos()
         self.view.drag_nodes(self.session_id, delta.x(), delta.y(), self._subtree)
 
+    def contextMenuEvent(self, event) -> None:
+        self.view.nodeMenuRequested.emit(self.session_id, event.screenPos())
+        event.accept()
+
     def mouseReleaseEvent(self, event) -> None:
         if self._press is None:
             return
@@ -152,6 +157,7 @@ class MapView(QGraphicsView):
     nodeActivated = Signal(int)
     nodesMoved = Signal(list)  # [(id, x, y), ...]
     createRootRequested = Signal(float, float)
+    nodeMenuRequested = Signal(int, QPoint)  # session id, global position
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -207,6 +213,16 @@ class MapView(QGraphicsView):
             edge = EdgeItem(self.nodes[parent_id], self.nodes[child_id], self.theme)
             self._scene.addItem(edge)
             self.edges.append(edge)
+
+    def remove_nodes(self, ids: list[int]) -> None:
+        gone = set(ids)
+        for edge in [e for e in self.edges if e.a.session_id in gone or e.b.session_id in gone]:
+            self._scene.removeItem(edge)
+            self.edges.remove(edge)
+        for sid in ids:
+            node = self.nodes.pop(sid, None)
+            if node is not None:
+                self._scene.removeItem(node)
 
     def set_title(self, session_id: int, title: str) -> None:
         node = self.nodes[session_id]
