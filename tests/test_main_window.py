@@ -35,7 +35,7 @@ def setup(qtbot):
 
 
 def wait_idle(qtbot, w):
-    qtbot.waitUntil(lambda: not w.workers, timeout=3000)
+    qtbot.waitUntil(w.idle, timeout=3000)
 
 
 def test_starts_with_one_root_on_map(setup):

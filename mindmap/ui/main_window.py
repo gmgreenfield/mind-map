@@ -183,7 +183,7 @@ class MainWindow(QMainWindow):
         worker.token.connect(lambda d, sid=sid: self._on_token(sid, d))
         worker.done.connect(lambda full, sid=sid: self._on_reply_done(sid, full))
         worker.failed.connect(lambda err, sid=sid: self._on_reply_failed(sid, err))
-        worker.finished.connect(worker.deleteLater)
+        self._track(worker)
         self.refresh_chat()
         worker.start()
 
@@ -217,8 +217,7 @@ class MainWindow(QMainWindow):
         worker.token.connect(dialog.append)
         worker.done.connect(dialog.finish)
         worker.failed.connect(dialog.fail)
-        self._background.add(worker)
-        worker.finished.connect(lambda w=worker: self._background.discard(w))
+        self._track(worker)
         worker.start()
 
         accepted = dialog.exec() == QDialog.Accepted
@@ -227,6 +226,23 @@ class MainWindow(QMainWindow):
         if not accepted:
             return None
         return self.create_branch(parent.id, dialog.title() or topic, dialog.brief())
+
+    def _track(self, worker: StreamWorker) -> None:
+        """Hold a reference until the thread has fully stopped.
+
+        Dropping the last reference while run() is still unwinding destroys a
+        running QThread, which aborts the process.
+        """
+        self._background.add(worker)
+
+        def release(w=worker):
+            w.wait()
+            self._background.discard(w)
+
+        worker.finished.connect(release)
+
+    def idle(self) -> bool:
+        return not self.workers and not self._background
 
     def closeEvent(self, event) -> None:
         for w in [*self.workers.values(), *self._background]:
