@@ -52,8 +52,22 @@ Keep context small (server ctx 8192).
 - Every logic module has tests; UI gets offscreen smoke tests.
 - Keep this file updated with state and decisions.
 
-## Status
+## Implementation notes
+- ⌘+arrow navigation only fires when the chat input is **empty**, so ⌘← / ⌘→
+  still work for text editing while typing.
+- `//text` sends a literal message starting with `/`.
+- A new root titled "New chat" is renamed from its first user message.
+- Map: trackpad scroll pans; pinch or ⌘-scroll zooms; mouse wheel zooms.
+- Connected nodes for ⌘+arrow = parent + children (not siblings/cousins).
+- Env overrides: `MINDMAP_DB`, `MINDMAP_LLM_URL`; serve.sh: `MINDMAP_MODEL`,
+  `MINDMAP_PORT`, `MINDMAP_CTX`, `MINDMAP_THREADS`.
+- Tests use `FakeClient` / `FakeBriefDialog` and `animation_ms = 0`.
+
+## Status (2026-11-22)
 - [x] Design agreed
-- [ ] Core modules + tests
-- [ ] UI
-- [ ] llama.cpp installed + model downloaded + end-to-end run
+- [x] Core modules + tests (store, llm, branching, layout, commands)
+- [x] UI (map view, chat view, brief dialog, main window) + tests — 63 passing
+- [x] Offscreen launch smoke test passes
+- [ ] llama.cpp installed (brew building from source — no Intel bottles on macOS 26)
+- [ ] Model downloaded + end-to-end run with real Qwen
+- [ ] Not yet: deleting/renaming nodes from the map, packaging as .app
