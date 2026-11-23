@@ -308,9 +308,9 @@ class FakeServer:
 @pytest.mark.parametrize(
     "server,kind,text",
     [
-        (FakeServer("ready"), "ready", "Qwen3-4B-Instruct-2507 ready"),
-        (FakeServer("loading"), "busy", "Loading Qwen3-4B-Instruct-2507…"),
-        (FakeServer("down"), "busy", "Starting Qwen3-4B-Instruct-2507…"),
+        (FakeServer("ready"), "ready", "Qwen3 4B ready"),
+        (FakeServer("loading"), "busy", "Loading Qwen3 4B…"),
+        (FakeServer("down"), "busy", "Starting Qwen3 4B…"),
         (FakeServer("down", exited=1), "error", "Local model stopped"),
         (FakeServer("down", ours=False), "error", "Local model offline"),
         (FakeServer("down", ours=False, missing=True), "error", "llama-server not found"),
@@ -388,11 +388,11 @@ def test_choose_model_updates_session_map_and_chat(setup):
     w, store, _ = setup
     root = store.sessions()[0]
     w.open_session(root.id)
-    assert "Qwen3-4B" in w.chat.model_btn.text()
+    assert "Qwen3 4B" in w.chat.model_btn.text()
     w.pick_model = lambda current: CLAUDE
     w.chat.modelRequested.emit()
     assert w.spec_for(root.id) == CLAUDE
-    assert "☁" in w.chat.model_btn.text() and "Claude Opus 5.5" in w.chat.model_btn.text()
+    assert "Claude Opus 5.5" in w.chat.model_btn.text()
     assert w.map.nodes[root.id].model_label == "Claude Opus 5.5"
     assert "Anthropic" in w.chat.model_status.text()
     w.pick_model = lambda current: None

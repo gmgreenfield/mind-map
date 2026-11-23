@@ -152,10 +152,11 @@ class Bubble(QFrame):
 
 
 class ThinkingBubble(QFrame):
-    def __init__(self):
+    def __init__(self, name: str = "Assistant"):
         super().__init__()
         self.setObjectName("thinkingBubble")
-        self.label = QLabel("Qwen is thinking")
+        self.name = name
+        self.label = QLabel(f"{name} is thinking")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 10, 14, 10)
         layout.addWidget(self.label)
@@ -166,16 +167,16 @@ class ThinkingBubble(QFrame):
 
     def _tick(self) -> None:
         self._dots = (self._dots + 1) % 4
-        self.label.setText("Qwen is thinking" + "." * self._dots)
+        self.label.setText(f"{self.name} is thinking" + "." * self._dots)
 
 
 class MessageRow(QWidget):
-    """Aligns a bubble left (Qwen) or right (you), with a small role label."""
+    """Aligns a bubble left (the model) or right (you), with a small role label."""
 
-    def __init__(self, bubble: QFrame, role: str):
+    def __init__(self, bubble: QFrame, role: str, name: str = "Assistant"):
         super().__init__()
         self.bubble = bubble
-        who = QLabel("You" if role == "user" else "Qwen")
+        who = QLabel("You" if role == "user" else name)
         who.setObjectName("role")
         col = QVBoxLayout()
         col.setSpacing(3)
@@ -336,7 +337,7 @@ class ChatView(QWidget):
         self.list_layout.setContentsMargins(4, 8, 12, 8)
         self.list_layout.setSpacing(14)
         self.list_layout.addWidget(self.brief_card)
-        self.empty_hint = QLabel("Empty chat. Say something to Qwen.")
+        self.empty_hint = QLabel("Empty chat. Say something to get started.")
         self.empty_hint.setObjectName("subtle")
         self.empty_hint.setAlignment(Qt.AlignCenter)
         self.list_layout.addWidget(self.empty_hint)
@@ -358,7 +359,7 @@ class ChatView(QWidget):
         self._status_timer.timeout.connect(self.status.hide)
 
         self.input = ChatInput()
-        self.input.setPlaceholderText("Message Qwen…    /branch <topic> · /parent · Esc for the map")
+        self.input.setPlaceholderText("Message…    /branch <topic> · /parent · Esc for the map")
         self.input.submitted.connect(self.sendRequested)
         self.input.navigate.connect(self.navigateRequested)
         self.send_btn = QToolButton()
@@ -389,6 +390,7 @@ class ChatView(QWidget):
 
         self.rows: list[MessageRow] = []
         self.partial_row: MessageRow | None = None
+        self.assistant_name = "Assistant"
 
     # --- content ----------------------------------------------------------------
     def show_session(
@@ -422,7 +424,7 @@ class ChatView(QWidget):
             if self.partial_row is None or not isinstance(self.partial_row.bubble, ThinkingBubble):
                 if self.partial_row is not None:
                     self._remove_row(self.partial_row)
-                self.partial_row = self._add_row(ThinkingBubble(), "assistant")
+                self.partial_row = self._add_row(ThinkingBubble(self.assistant_name), "assistant")
         else:
             if self.partial_row is None or not isinstance(self.partial_row.bubble, Bubble):
                 if self.partial_row is not None:
@@ -433,7 +435,7 @@ class ChatView(QWidget):
         self._update_empty_hint()
 
     def _add_row(self, bubble: QFrame, role: str) -> MessageRow:
-        row = MessageRow(bubble, role)
+        row = MessageRow(bubble, role, self.assistant_name)
         bubble.setMaximumWidth(self._bubble_width())
         self.list_layout.insertWidget(self.list_layout.count() - 1, row)
         self.rows.append(row)
@@ -473,7 +475,10 @@ class ChatView(QWidget):
 
     # --- misc ---------------------------------------------------------------------
     def set_model_label(self, label: str, cloud: bool) -> None:
-        self.model_btn.setText(f"{'☁  ' if cloud else ''}{label}  ▾")
+        """Shown on the header chip and as the name on the model's replies."""
+        self.assistant_name = label
+        self.model_btn.setText(f"{label}  ▾")
+        self.model_btn.setProperty("cloud", cloud)
 
     def set_model_status(self, html_text: str) -> None:
         self.model_status.setText(html_text)

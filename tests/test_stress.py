@@ -170,7 +170,7 @@ def test_concurrent_replies_land_in_their_own_sessions(qtbot):
     assert w.map.nodes[a.id].busy and w.map.nodes[b.id].busy
     # Sending again while busy is refused, not queued.
     w.handle_input("hello again")
-    assert "still replying" in w.chat.status.text()
+    assert "Still replying" in w.chat.status.text()
     wait_idle(qtbot, w)
     assert "cost" in store.messages(a.id)[-1].content
     assert "mock" in store.messages(b.id)[-1].content

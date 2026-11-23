@@ -1,4 +1,4 @@
-"""Shows the handoff brief as Qwen writes it; user edits, then confirms or cancels."""
+"""Shows the handoff brief as the model writes it; user edits, then confirms or cancels."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class BriefDialog(QDialog):
         self.resize(560, 460)
 
         self.title_edit = QLineEdit(topic)
-        self.status = QLabel("Qwen is writing the handoff brief…")
+        self.status = QLabel("Writing the handoff brief…")
         self.editor = QPlainTextEdit()
         self.editor.setReadOnly(True)
 

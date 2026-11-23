@@ -42,6 +42,9 @@ class ModelSpec:
     def label(self) -> str:
         """Short name for the map and the chat header."""
         if self.provider == "local":
+            for label, repo, _note in LOCAL_PRESETS:
+                if repo == self.name:
+                    return label
             repo = self.name.split(":")[0].split("/")[-1]
             return repo.removesuffix("-GGUF").removesuffix("-gguf")
         for label, model_id in CLAUDE_PRESETS:
@@ -54,9 +57,9 @@ DEFAULT_MODEL = ModelSpec("local", "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M")
 
 # (label, Hugging Face "repo:quant" for llama-server -hf, note)
 LOCAL_PRESETS = [
-    ("Qwen3 4B Instruct", "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
+    ("Qwen3 4B", "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
      "2.5 GB download · fast on any Mac"),
-    ("Qwen3 30B-A3B Instruct", "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_M",
+    ("Qwen3 30B-A3B", "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_M",
      "~18 GB download · smarter, needs 32 GB RAM"),
 ]
 

@@ -46,7 +46,8 @@ def test_bad_values_fall_back_to_default(bad):
 
 
 def test_labels():
-    assert ModelSpec.parse("local:unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M").label == "Qwen3-4B-Instruct-2507"
+    assert ModelSpec.parse("local:unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M").label == "Qwen3 4B"
+    assert ModelSpec("local", "someone/Other-7B-GGUF:Q4").label == "Other-7B"
     assert ModelSpec("anthropic", "claude-opus-5-5").label == "Claude Opus 5.5"
     assert ModelSpec("openai", "some-model").label == "some-model"
 

@@ -175,6 +175,15 @@ def test_inline_code_uses_a_real_monospace_font():
 def test_model_chip(qtbot):
     v = make(qtbot)
     v.set_model_label("Claude Opus 5.5", cloud=True)
-    assert v.model_btn.text().startswith("☁") and "Claude Opus 5.5" in v.model_btn.text()
+    assert "Claude Opus 5.5" in v.model_btn.text() and v.assistant_name == "Claude Opus 5.5"
     with qtbot.waitSignal(v.modelRequested):
         v.model_btn.click()
+
+
+def test_replies_are_labelled_with_the_model_name(qtbot):
+    v = make(qtbot)
+    v.set_model_label("Claude Opus 5.5", cloud=True)
+    v.show_session([sess(1, "root")], msgs(("user", "hi"), ("assistant", "yo")), partial="")
+    names = [r.findChild(type(v.crumbs), "role").text() for r in v.rows]
+    assert names == ["You", "Claude Opus 5.5", "Claude Opus 5.5"]
+    assert "Claude Opus 5.5 is thinking" in v.bubbles()[-1].label.text()

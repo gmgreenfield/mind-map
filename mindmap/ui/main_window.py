@@ -106,11 +106,11 @@ class MainWindow(QMainWindow):
         sid = self.current_id
         if sid is None:
             return
+        spec = self.spec_for(sid)
+        self.chat.set_model_label(spec.label, cloud=not spec.is_local)
         self.chat.show_session(
             self.store.ancestry(sid), self.store.messages(sid), self.partials.get(sid)
         )
-        spec = self.spec_for(sid)
-        self.chat.set_model_label(spec.label, cloud=not spec.is_local)
         self._update_chat_status()
 
     def back_to_map(self) -> None:
@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
         if sid is None:
             return
         if sid in self.workers:
-            self.chat.flash("Qwen is still replying in this session.")
+            self.chat.flash("Still replying in this chat. Wait for it to finish.")
             return
         session = self.store.get_session(sid)
         if session.title == NEW_CHAT and not self.store.messages(sid):
@@ -325,7 +325,7 @@ class MainWindow(QMainWindow):
     def _finish_reply(self, sid: int, text: str) -> None:
         self.workers.pop(sid, None)
         self.partials.pop(sid, None)
-        if not self._exists(sid):  # deleted while Qwen was replying
+        if not self._exists(sid):  # deleted while the model was replying
             return
         if text.strip():
             self.store.add_message(sid, "assistant", text.strip())
