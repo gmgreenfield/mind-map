@@ -70,6 +70,9 @@ Keep context small (server ctx 8192).
   map/store/chat invariants after every step.
 - Threads: workers must stay referenced until `finished` + `wait()`
   (`MainWindow._track`) — dropping them early aborts the process.
+- GC: automatic garbage collection is off; `ui/gc_guard.py` collects on a
+  main-thread timer (app and tests). GC on a reply thread freeing a Qt object
+  segfaulted CI. Releases: push a `v*` tag; the build runs `--self-check`.
 
 ## Conventions
 - Atomic git commits, one logical change each.
