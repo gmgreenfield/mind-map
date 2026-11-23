@@ -41,7 +41,7 @@ Keep context small (server ctx 8192).
 
 ## Commands
 - Setup: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
-- Model server: `scripts/serve.sh` (first run downloads ~2.5 GB)
+- Model server: `scripts/serve.sh` (first run downloads ~2.5 GB to `~/Library/Caches/llama.cpp`)
 - App: `.venv/bin/python -m mindmap`
 - **App without a model:** `.venv/bin/python -m mindmap --mock --demo`
   (`--reset-demo` re-seeds; demo uses `demo.db`, never the real `mindmap.db`)
@@ -85,6 +85,8 @@ Keep context small (server ctx 8192).
 - [x] UI (map view, chat view, brief dialog, main window) + tests
 - [x] Mock Qwen, demo map, stress tests — 91 passing
 - [x] Offscreen launch smoke test passes
-- [ ] llama.cpp installed (brew building from source — no Intel bottles on macOS 26)
-- [ ] Model downloaded + end-to-end run with real Qwen
+- [x] llama.cpp b12648 prebuilt (macOS x64, CPU) in `~/.local/llama.cpp/current`
+  — Homebrew abandoned: no Intel bottles on macOS 26, built everything from source
+- [x] Model downloaded; real Qwen streams ~8–9 words/s, first token ~0.3 s
+- [ ] Try branching with the real model and tune the brief prompt
 - [ ] Not yet: deleting/renaming nodes from the map, packaging as .app
