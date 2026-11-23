@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from mindmap.llm import LLMClient, LLMError
+from mindmap.llm import DEFAULT_MAX_TOKENS, TRUNCATION_NOTE, LLMClient, LLMError
 
 
 def sse(*deltas, done=True):
@@ -66,3 +66,41 @@ def test_connection_error_has_helpful_message():
     c = client_for(handler)
     with pytest.raises(LLMError, match="serve.sh"):
         c.complete([])
+
+
+def test_sends_max_tokens_by_default():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, text=sse("x"))
+
+    client_for(handler).complete([])
+    assert seen["body"]["max_tokens"] == DEFAULT_MAX_TOKENS
+
+
+def test_max_tokens_none_omits_limit():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, text=sse("x"))
+
+    c = LLMClient(base_url="http://test/v1", transport=httpx.MockTransport(handler), max_tokens=None)
+    c.complete([])
+    assert "max_tokens" not in seen["body"]
+
+
+def test_length_cutoff_appends_note():
+    body = sse("partial", done=False) + (
+        'data: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n'
+    )
+    text = client_for(lambda r: httpx.Response(200, text=body)).complete([])
+    assert text == "partial" + TRUNCATION_NOTE
+
+
+def test_normal_stop_has_no_note():
+    body = sse("done", done=False) + (
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'
+    )
+    assert client_for(lambda r: httpx.Response(200, text=body)).complete([]) == "done"
