@@ -26,6 +26,7 @@ def setup(qtbot):
     w = MainWindow(store, client)
     w.map.animation_ms = 0
     w.brief_dialog_factory = FakeBriefDialog
+    w.pick_model = lambda current: current
     FakeBriefDialog.accept = True
     FakeBriefDialog.brief_override = None
     qtbot.addWidget(w)
@@ -289,6 +290,8 @@ def test_rename_from_chat_menu(setup):
 
 # --- model status ----------------------------------------------------------------
 class FakeServer:
+    model = "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M"
+
     def __init__(self, state="down", ours=True, exited=None, missing=False):
         self.state, self._ours, self._exited, self.missing = state, ours, exited, missing
 
@@ -305,11 +308,11 @@ class FakeServer:
 @pytest.mark.parametrize(
     "server,kind,text",
     [
-        (FakeServer("ready"), "ready", "Qwen ready"),
-        (FakeServer("loading"), "busy", "Loading Qwen…"),
-        (FakeServer("down"), "busy", "Starting Qwen…"),
-        (FakeServer("down", exited=1), "error", "Qwen stopped"),
-        (FakeServer("down", ours=False), "error", "Qwen offline"),
+        (FakeServer("ready"), "ready", "Qwen3-4B-Instruct-2507 ready"),
+        (FakeServer("loading"), "busy", "Loading Qwen3-4B-Instruct-2507…"),
+        (FakeServer("down"), "busy", "Starting Qwen3-4B-Instruct-2507…"),
+        (FakeServer("down", exited=1), "error", "Local model stopped"),
+        (FakeServer("down", ours=False), "error", "Local model offline"),
         (FakeServer("down", ours=False, missing=True), "error", "llama-server not found"),
     ],
 )
@@ -318,7 +321,7 @@ def test_model_status(qtbot, server, kind, text):
     w = MainWindow(store, FakeClient(), server)
     qtbot.addWidget(w)
     assert w.model_status[0] == kind and w.model_status[1].startswith(text)
-    assert text in w.map.model_status.text() and text in w.chat.model_status.text()
+    assert text in w.map.model_status.text()
     w.close()
     store.close()
 
@@ -329,7 +332,7 @@ def test_status_poll_switches_to_ready(qtbot):
     w = MainWindow(store, FakeClient(), server)
     qtbot.addWidget(w)
     server.state = "ready"
-    qtbot.waitUntil(lambda: w.model_status[1] == "Qwen ready", timeout=3000)
+    qtbot.waitUntil(lambda: w.model_status[1].endswith(" ready"), timeout=3000)
     w.close()
     store.close()
 
@@ -337,3 +340,86 @@ def test_status_poll_switches_to_ready(qtbot):
 def test_no_server_means_no_status(setup):
     w, _, _ = setup
     assert w.map.model_status.isHidden()
+
+
+
+# --- model choice -------------------------------------------------------------------
+from mindmap.models import DEFAULT_MODEL, ModelSpec  # noqa: E402
+
+CLAUDE = ModelSpec("anthropic", "claude-opus-5-5")
+
+
+class FakeRouter:
+    def __init__(self):
+        self.asked = []
+
+    def client_for(self, spec):
+        self.asked.append(spec)
+        router = self
+
+        class C:
+            def stream_chat(self, messages, temperature=0.7):
+                yield f"from {spec.provider}"
+
+        return C()
+
+
+def test_new_root_asks_for_model_and_cancel_creates_nothing(setup):
+    w, store, _ = setup
+    w.pick_model = lambda current: None
+    assert w.create_root(300, 300) is None
+    assert len(store.sessions()) == 1
+    w.pick_model = lambda current: CLAUDE
+    s = w.create_root(300, 300)
+    assert store.get_session(s.id).model == str(CLAUDE)
+    assert w.last_model == CLAUDE
+    assert w.map.nodes[s.id].model_label == "Claude Opus 5.5"
+
+
+def test_branches_inherit_model(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    store.set_model(root.id, str(CLAUDE))
+    child = w.create_branch(root.id, "c", "b")
+    assert store.get_session(child.id).model == str(CLAUDE)
+
+
+def test_choose_model_updates_session_map_and_chat(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    w.open_session(root.id)
+    assert "Qwen3-4B" in w.chat.model_btn.text()
+    w.pick_model = lambda current: CLAUDE
+    w.chat.modelRequested.emit()
+    assert w.spec_for(root.id) == CLAUDE
+    assert "☁" in w.chat.model_btn.text() and "Claude Opus 5.5" in w.chat.model_btn.text()
+    assert w.map.nodes[root.id].model_label == "Claude Opus 5.5"
+    assert "Anthropic" in w.chat.model_status.text()
+    w.pick_model = lambda current: None
+    assert not w.choose_model(root.id)
+    assert w.spec_for(root.id) == CLAUDE
+
+
+def test_each_session_uses_its_own_models_client(qtbot):
+    store = Store()
+    router = FakeRouter()
+    w = MainWindow(store, router)
+    w.map.animation_ms = 0
+    w.brief_dialog_factory = FakeBriefDialog
+    qtbot.addWidget(w)
+    root = store.sessions()[0]
+    w.open_session(root.id)
+    w.handle_input("hi")
+    qtbot.waitUntil(w.idle, timeout=3000)
+    assert store.messages(root.id)[-1].content == "from local"
+    assert router.asked[-1] == DEFAULT_MODEL
+    store.set_model(root.id, str(CLAUDE))
+    w.handle_input("again")
+    qtbot.waitUntil(w.idle, timeout=3000)
+    assert store.messages(root.id)[-1].content == "from anthropic"
+    # The brief for a branch is written by the parent's model.
+    FakeBriefDialog.accept = True
+    w.handle_input("/branch side topic")
+    assert router.asked[-1] == CLAUDE
+    w.close()
+    store.close()

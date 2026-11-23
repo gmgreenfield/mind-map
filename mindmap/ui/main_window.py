@@ -15,11 +15,13 @@ from PySide6.QtWidgets import (
 from .. import branching
 from ..commands import Command, CommandError, parse, unescape
 from ..layout import Point, nearest_in_direction, place_child
+from ..models import COMPANIES, DEFAULT_MODEL, ModelSpec
 from ..store import Session, Store
 from .brief_dialog import BriefDialog
 from .chat_view import ChatView
 from . import style
 from .map_view import MapView
+from .model_picker import pick_model
 from .worker import StreamWorker
 
 NEW_CHAT = "New chat"
@@ -39,6 +41,10 @@ class MainWindow(QMainWindow):
         self._background: set[StreamWorker] = set()
         self.brief_dialog_factory = BriefDialog
         # Swappable in tests: (title, label, text) -> (text, ok) and (title, text) -> bool
+        # (current ModelSpec) -> chosen ModelSpec or None; swappable in tests
+        self.pick_model = lambda current: pick_model(current, self)
+        self.last_model: ModelSpec = DEFAULT_MODEL
+        self._status_html = ""
         self.ask_text = lambda title, label, text: QInputDialog.getText(
             self, title, label, text=text
         )
@@ -66,6 +72,7 @@ class MainWindow(QMainWindow):
         self.chat.navigateRequested.connect(self.navigate)
         self.chat.renameRequested.connect(lambda: self.rename_session(self.current_id))
         self.chat.deleteRequested.connect(lambda: self.delete_session(self.current_id))
+        self.chat.modelRequested.connect(lambda: self.choose_model(self.current_id))
 
         if not self.store.sessions():
             self.store.create_session(NEW_CHAT, x=0, y=0)
@@ -102,6 +109,9 @@ class MainWindow(QMainWindow):
         self.chat.show_session(
             self.store.ancestry(sid), self.store.messages(sid), self.partials.get(sid)
         )
+        spec = self.spec_for(sid)
+        self.chat.set_model_label(spec.label, cloud=not spec.is_local)
+        self._update_chat_status()
 
     def back_to_map(self) -> None:
         self.stack.setCurrentWidget(self.map)
@@ -134,11 +144,38 @@ class MainWindow(QMainWindow):
         self.pivot_to(target.id)
 
     # --- sessions -------------------------------------------------------------
-    def create_root(self, x: float, y: float) -> Session:
-        s = self.store.create_session(NEW_CHAT, x=x, y=y)
+    def create_root(self, x: float, y: float) -> Session | None:
+        """A new topic starts by choosing its model; cancelling creates nothing."""
+        spec = self.pick_model(self.last_model)
+        if spec is None:
+            return None
+        self.last_model = spec
+        s = self.store.create_session(NEW_CHAT, x=x, y=y, model=str(spec))
         self.map.add_node(s)
         self.open_session(s.id)
         return s
+
+    # --- models ------------------------------------------------------------------
+    def spec_for(self, sid: int) -> ModelSpec:
+        return ModelSpec.parse(self.store.get_session(sid).model)
+
+    def client_for(self, sid: int):
+        """The client for a session's model (a plain test/mock client serves all)."""
+        router = getattr(self.client, "client_for", None)
+        return router(self.spec_for(sid)) if router else self.client
+
+    def choose_model(self, sid: int | None) -> bool:
+        if sid is None:
+            return False
+        spec = self.pick_model(self.spec_for(sid))
+        if spec is None:
+            return False
+        self.last_model = spec
+        self.store.set_model(sid, str(spec))
+        self.map.set_model_label(sid, spec.label)
+        if sid == self.current_id and self.in_chat():
+            self.refresh_chat()
+        return True
 
     def create_branch(self, parent_id: int, title: str, brief: str) -> Session:
         parent = self.store.get_session(parent_id)
@@ -152,7 +189,12 @@ class MainWindow(QMainWindow):
             (grandparent.x, grandparent.y) if grandparent else None,
         )
         child = self.store.create_session(
-            branching.title_from_text(title), parent_id=parent_id, brief=brief, x=x, y=y
+            branching.title_from_text(title),
+            parent_id=parent_id,
+            brief=brief,
+            x=x,
+            y=y,
+            model=parent.model,  # branches inherit the parent's model
         )
         self.map.add_node(child)
         self.pivot_to(child.id)
@@ -169,6 +211,7 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         menu.addAction("Open", lambda: self.open_session(sid))
         menu.addAction("Rename…", lambda: self.rename_session(sid))
+        menu.addAction("Model…", lambda: self.choose_model(sid))
         menu.addSeparator()
         menu.addAction("Delete…", lambda: self.delete_session(sid))
         menu.exec(pos)
@@ -263,7 +306,7 @@ class MainWindow(QMainWindow):
         self.chat.clear_input()
 
         context = branching.chat_context(session.brief, self.store.messages(sid))
-        worker = StreamWorker(self.client, context)
+        worker = StreamWorker(self.client_for(sid), context)
         self.workers[sid] = worker
         self.partials[sid] = ""
         self.map.set_busy(sid, True)
@@ -302,7 +345,7 @@ class MainWindow(QMainWindow):
         parent = self.store.get_session(self.current_id)
         dialog = self.brief_dialog_factory(topic, self)
         request = branching.brief_request(parent.brief, self.store.messages(parent.id), topic)
-        worker = StreamWorker(self.client, request, temperature=0.3)
+        worker = StreamWorker(self.client_for(parent.id), request, temperature=0.3)
         worker.token.connect(dialog.append)
         worker.done.connect(dialog.finish)
         worker.failed.connect(dialog.fail)
@@ -341,29 +384,43 @@ class MainWindow(QMainWindow):
         colors = {"ready": "#3a9d5d", "busy": "#e0a030", "error": "#d9534f", "info": "#8a8f98"}
         html_text = f'<span style="color:{colors[kind]}">●</span>&nbsp;{text}' if text else ""
         self.model_status = (kind, text)
+        self._status_html = html_text
         self.map.set_model_status(html_text)
-        self.chat.set_model_status(html_text)
+        self._update_chat_status()
+
+    def _update_chat_status(self) -> None:
+        """The local server's status matters in a chat only if it uses a local model."""
+        if self.current_id is None or not self._exists(self.current_id):
+            return
+        spec = self.spec_for(self.current_id)
+        if spec.is_local:
+            self.chat.set_model_status(self._status_html)
+        else:
+            self.chat.set_model_status(f"Sent to {COMPANIES[spec.provider]}")
 
     def poll_model_status(self) -> None:
         state = self.server.health()
+        name = ModelSpec("local", self.server.model).label if getattr(self.server, "model", None) else "Local model"
         if state == "ready":
-            self.set_model_status("ready", "Qwen ready")
+            self.set_model_status("ready", f"{name} ready")
             self._status_timer.setInterval(5000)
             return
         self._status_timer.setInterval(1000)
         if state == "loading":
-            self.set_model_status("busy", "Loading Qwen…")
+            self.set_model_status("busy", f"Loading {name}…")
         elif getattr(self.server, "missing", False):
             self.set_model_status("error", "llama-server not found")
         elif self.server.ours() and self.server.exited() is not None:
-            self.set_model_status("error", "Qwen stopped — see ~/Library/Logs/MindMap")
+            self.set_model_status("error", "Local model stopped — see ~/Library/Logs/MindMap")
         elif self.server.ours():
-            self.set_model_status("busy", "Starting Qwen…")
+            self.set_model_status("busy", f"Starting {name}…")
         else:
-            self.set_model_status("error", "Qwen offline")
+            self.set_model_status("error", "Local model offline")
 
     def closeEvent(self, event) -> None:
         self._status_timer.stop()
+        if self.server is not None and hasattr(self.server, "interrupt"):
+            self.server.interrupt()  # free workers waiting for a model to load
         for w in [*self.workers.values(), *self._background]:
             w.stop()
             w.wait(2000)

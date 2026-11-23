@@ -14,6 +14,7 @@ PROVIDERS = {
     "anthropic": "Claude",
     "openai": "ChatGPT",
 }
+COMPANIES = {"anthropic": "Anthropic", "openai": "OpenAI"}
 
 
 @dataclass(frozen=True)

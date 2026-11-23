@@ -20,6 +20,7 @@ def make_window(qtbot, store, client):
     w.brief_dialog_factory = FakeBriefDialog
     FakeBriefDialog.accept = True
     w.confirm = lambda *a: True
+    w.pick_model = lambda current: current
     w.ask_text = lambda title, label, text: (text + " (renamed)", True)
     w.resize(1100, 750)
     qtbot.addWidget(w)
