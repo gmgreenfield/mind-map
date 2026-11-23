@@ -83,3 +83,59 @@ def test_find_binary_uses_bundle(tmp_path, monkeypatch):
 def test_model_env_override(tmp_path, monkeypatch):
     monkeypatch.setenv("MINDMAP_MODEL", "x/y:Q8")
     assert "x/y:Q8" in ModelServer(log_dir=tmp_path).command(tmp_path / "bin")
+
+
+# --- model switching ---------------------------------------------------------------
+class SeqTransport(httpx.MockTransport):
+    """Health answers taken from a list (last one repeats)."""
+
+    def __init__(self, statuses):
+        self.statuses = list(statuses)
+
+        def handler(request):
+            status = self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
+            if status is None:
+                raise httpx.ConnectError("refused", request=request)
+            return httpx.Response(status)
+
+        super().__init__(handler)
+
+
+def test_use_same_model_is_a_no_op_when_up(tmp_path):
+    s = ModelServer(log_dir=tmp_path, binary=fake_binary(tmp_path), transport=with_health(200))
+    s.use_model(s.model)
+    assert not s.ours()
+
+
+def test_use_model_restarts_our_server_with_new_model(tmp_path):
+    s = ModelServer(log_dir=tmp_path, binary=fake_binary(tmp_path), transport=with_health(None))
+    s.ensure_running()
+    first = s.proc.pid
+    s.use_model("other/repo:Q8")
+    assert s.model == "other/repo:Q8" and s.ours() and s.proc.pid != first
+    assert "other/repo:Q8" in s.command(tmp_path / "b")
+    s.stop()
+
+
+def test_cannot_switch_external_server(tmp_path):
+    s = ModelServer(log_dir=tmp_path, binary=fake_binary(tmp_path), transport=with_health(200))
+    with pytest.raises(server.LLMError, match="outside the app"):
+        s.use_model("other/repo:Q8")
+
+
+def test_wait_until_ready(tmp_path):
+    s = ModelServer(log_dir=tmp_path, transport=SeqTransport([503, 503, 200]))
+    s.wait_until_ready(timeout=5)
+
+
+def test_wait_reports_crash_and_interrupt(tmp_path):
+    s = ModelServer(log_dir=tmp_path, binary=fake_binary(tmp_path, "exit 2"), transport=with_health(None))
+    s.ensure_running()
+    s.proc.wait(3)
+    with pytest.raises(server.LLMError, match="stopped"):
+        s.wait_until_ready(timeout=5)
+    s.stop()
+    s2 = ModelServer(log_dir=tmp_path, transport=with_health(503))
+    s2.interrupt()
+    with pytest.raises(server.LLMError, match="Cancelled"):
+        s2.wait_until_ready(timeout=5)

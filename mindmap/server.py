@@ -11,9 +11,13 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 import httpx
+
+from .llm import LLMError
 
 DEFAULT_MODEL = "unsloth/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M"
 DEFAULT_PORT = 8080
@@ -72,6 +76,8 @@ class ModelServer:
         self.log_path = log_dir / "llama-server.log"
         self.proc: subprocess.Popen | None = None
         self.missing = False  # no llama-server binary found
+        self._lock = threading.Lock()
+        self._interrupt = threading.Event()
         self.http = httpx.Client(
             base_url=f"http://127.0.0.1:{port}", timeout=httpx.Timeout(0.5), transport=transport
         )
@@ -128,6 +134,42 @@ class ModelServer:
         log.close()  # the child has its own handle
         return "started"
 
+    def use_model(self, model: str) -> None:
+        """Make sure llama-server is serving this model, restarting ours if needed."""
+        with self._lock:
+            if model == self.model:
+                if self.health() == "down" and (self.proc is None or self.exited() is not None):
+                    self.proc = None
+                    self.ensure_running()
+                return
+            if self.proc is None and self.health() != "down":
+                raise LLMError(
+                    "A llama-server started outside the app is running, so the app can't "
+                    "switch models. Stop it (or scripts/serve.sh) and try again."
+                )
+            self.stop()
+            self.model = model
+            if self.ensure_running() == "missing":
+                raise LLMError("llama-server not found, so local models can't run.")
+
+    def wait_until_ready(self, timeout: float = 1800) -> None:
+        """Block until the model answers. The first use of a model includes its download."""
+        end = time.time() + timeout
+        while time.time() < end:
+            if self._interrupt.is_set():
+                raise LLMError("Cancelled.")
+            state = self.health()
+            if state == "ready":
+                return
+            if self.proc is not None and self.exited() is not None:
+                raise LLMError(f"llama-server stopped. See {self.log_path}")
+            time.sleep(0.5)
+        raise LLMError("Timed out waiting for the local model to load.")
+
+    def interrupt(self) -> None:
+        """Wake any thread stuck in wait_until_ready (used on quit)."""
+        self._interrupt.set()
+
     def stop(self, timeout: float = 5.0) -> None:
         if self.proc is None:
             return
@@ -141,5 +183,6 @@ class ModelServer:
         self.proc = None
 
     def close(self) -> None:
+        self.interrupt()
         self.stop()
         self.http.close()
