@@ -92,5 +92,6 @@ Keep context small (server ctx 8192).
   Brief ~16–25 s, normal replies 8–20 s; long unprompted replies can take 90 s.
 - Brief prompt sends the parent chat as a quoted TRANSCRIPT in one message —
   as chat turns, Qwen3-4B reversed stated conclusions (see commit 3fda70d).
-- [ ] Consider capping reply length (max_tokens / stronger "concise" prompt)
+- [x] Replies capped at 512 tokens (`DEFAULT_MAX_TOKENS`) with a visible cut-off
+  note; system prompt asks for brief, emoji-free answers. Same prompt: 92 s → 17 s.
 - [ ] Not yet: deleting/renaming nodes from the map, packaging as .app
