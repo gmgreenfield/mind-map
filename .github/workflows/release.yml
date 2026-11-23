@@ -1,0 +1,62 @@
+name: release
+
+# Push a tag like v0.1.0 to build the app for Apple Silicon and Intel
+# and attach both zips to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  LLAMA_BUILD: b12648
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+            sha256: 0bd241a5dae70c6c98db113862de1abdccb60aa250cd7623f7eb1614c14b7708
+          - runner: macos-15-intel
+            arch: x64
+            sha256: 615781abcf92fc99bbc3a8535d5d330a63cca4d39068697efa9e287b5108951a
+    runs-on: ${{ matrix.runner }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Fetch llama.cpp ${{ env.LLAMA_BUILD }} (${{ matrix.arch }})
+        run: |
+          name="llama-${LLAMA_BUILD}-bin-macos-${{ matrix.arch }}.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$name" \
+            "https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_BUILD}/$name"
+          echo "${{ matrix.sha256 }}  $RUNNER_TEMP/$name" | shasum -a 256 -c
+          mkdir -p "$RUNNER_TEMP/llama"
+          tar -xzf "$RUNNER_TEMP/$name" -C "$RUNNER_TEMP/llama"
+          echo "LLAMA_DIR=$RUNNER_TEMP/llama/llama-${LLAMA_BUILD}" >> "$GITHUB_ENV"
+
+      - name: Set up venv
+        run: python -m venv .venv && .venv/bin/pip install -r requirements.txt
+
+      - name: Test
+        run: .venv/bin/pytest -q
+
+      - name: Build app
+        run: scripts/build_app.sh
+
+      - name: Zip
+        run: |
+          ditto -c -k --keepParent "dist/Mind Map.app" "Mind-Map-macOS-${{ matrix.arch }}.zip"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: Mind-Map-macOS-${{ matrix.arch }}.zip
+          generate_release_notes: true
