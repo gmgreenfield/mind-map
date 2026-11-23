@@ -43,7 +43,23 @@ Keep context small (server ctx 8192).
 - Setup: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
 - Model server: `scripts/serve.sh` (first run downloads ~2.5 GB)
 - App: `.venv/bin/python -m mindmap`
+- **App without a model:** `.venv/bin/python -m mindmap --mock --demo`
+  (`--reset-demo` re-seeds; demo uses `demo.db`, never the real `mindmap.db`)
 - Tests: `.venv/bin/pytest`
+
+## Mock + demo
+- `mindmap/mock_llm.py` — `MockLLMClient`, same interface as `LLMClient`.
+  Keyword-scripted replies; branch requests get a brief built from the real
+  parent messages (and the parent's goal), so context transfer is visible.
+- `mindmap/demo.py` — 13-node demo map (coffee roastery + Kyoto trip), up to
+  4 levels deep, hand-written conversations and briefs; positions come from
+  the real `place_child`.
+- `tests/test_stress.py` — drives the real MainWindow with the mock: deep
+  branch chains, 12-way fan-out, full-tree navigation, concurrent replies,
+  drag + reload from disk, and seeded random walks (150 actions) checking
+  map/store/chat invariants after every step.
+- Threads: workers must stay referenced until `finished` + `wait()`
+  (`MainWindow._track`) — dropping them early aborts the process.
 
 ## Conventions
 - Atomic git commits, one logical change each.
@@ -66,7 +82,8 @@ Keep context small (server ctx 8192).
 ## Status (2026-11-22)
 - [x] Design agreed
 - [x] Core modules + tests (store, llm, branching, layout, commands)
-- [x] UI (map view, chat view, brief dialog, main window) + tests — 63 passing
+- [x] UI (map view, chat view, brief dialog, main window) + tests
+- [x] Mock Qwen, demo map, stress tests — 91 passing
 - [x] Offscreen launch smoke test passes
 - [ ] llama.cpp installed (brew building from source — no Intel bottles on macOS 26)
 - [ ] Model downloaded + end-to-end run with real Qwen
