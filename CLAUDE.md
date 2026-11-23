@@ -23,6 +23,12 @@ The model runs locally: Qwen3-4B-Instruct-2507 (Q4_K_M GGUF) via llama.cpp's
   direction.
 - Double-click empty canvas: new independent root session.
 - **No merging** child conclusions back into the parent.
+- **Model per topic:** a new root opens the model picker (cancel = no root);
+  branches inherit the parent's model; any chat can switch via the header chip
+  or node menu. Providers: local llama.cpp (presets or any HF GGUF), Claude
+  (Anthropic SDK, server-side refusal fallback on supported models, no
+  temperature), ChatGPT (OpenAI SDK). Keys in macOS Keychain (`keys.py`), env
+  vars win. One local model at a time: switching restarts our llama-server.
 - Persistence: SQLite (`~/Library/Application Support/MindMap/mindmap.db`).
 
 ## Hardware constraints
@@ -105,4 +111,7 @@ Keep context small (server ctx 8192).
 - [x] App starts its own llama-server if none is running, stops it on quit;
   status label shows Starting/Loading/Ready/Stopped
 - [x] Packaged as `dist/Mind Map.app` (ad-hoc signed, works when opened from Finder)
+- [x] Model choice per topic: local / Claude / ChatGPT (`models.py`,
+  `providers.py`, `ui/model_picker.py`). Claude/OpenAI tested with fake SDK
+  clients only — no API keys on this machine yet.
 - Next ideas: reparent instead of deleting children; undo delete; notarized build

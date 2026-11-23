@@ -34,9 +34,12 @@ spatially:
 - **The map is the interface.** No sidebars, no chat list. Click a node to zoom into
   it, press Esc to zoom out, drag branches around, and move between connected chats
   with ⌘ + arrow keys.
-- **Fully local.** Runs [Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)
-  through [llama.cpp](https://github.com/ggml-org/llama.cpp) on your Mac. Nothing leaves
-  your machine.
+- **Your choice of model, per topic.** Pick one when a topic starts; its branches inherit
+  it, and you can switch any chat later:
+  - **Local** (default): [Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507),
+    Qwen3-30B-A3B, or any GGUF model on Hugging Face, run by
+    [llama.cpp](https://github.com/ggml-org/llama.cpp) on your Mac. Nothing leaves your machine.
+  - **Claude** or **ChatGPT** with your own API key (stored in the macOS Keychain).
 
 <p align="center">
   <img src="docs/map.png" width="49%" alt="The map with several branched chats">
@@ -83,12 +86,13 @@ ln -sfn ~/.local/llama.cpp/llama-<build> ~/.local/llama.cpp/current
 |---|---|
 | Open a chat | Click its node |
 | Back to the map | **Esc** or **‹ Map** |
-| New topic | Double-click empty space on the map |
+| New topic | Double-click empty space on the map, then pick a model |
 | Branch the current chat | `/branch <topic>` or **Branch** |
 | Go to the parent | `/parent`, or click it in the breadcrumb |
 | Move to a connected chat | **⌘ + arrow** (when the message box is empty) |
 | Move a branch | Drag a node (its children follow). **⌥-drag** moves just that node |
 | Rename or delete | Right-click a node, or **⋯** in a chat |
+| Change a chat's model | Click the model name at the top of the chat, or right-click its node |
 | Pan / zoom | Scroll / pinch or ⌘-scroll |
 
 ## How branching works
@@ -120,6 +124,9 @@ mindmap/
   store.py        SQLite: sessions (nodes) and messages
   branching.py    chat context, handoff brief prompt
   layout.py       where new branches go, ⌘-arrow navigation
+  models.py       which model a chat uses (local / Claude / ChatGPT)
+  providers.py    Claude and ChatGPT clients, local model switching
+  keys.py         API keys in the macOS Keychain
   llm.py          streaming client for llama-server
   server.py       starts and stops llama-server
   mock_llm.py     scripted model for tests and demos
