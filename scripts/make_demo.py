@@ -1,7 +1,7 @@
 """Record the README demo: the real app, offscreen, with scripted replies.
 
 Usage: python scripts/make_demo.py docs/   (needs ffmpeg on PATH)
-Writes docs/demo.gif, docs/map.png and docs/chat.png.
+Writes docs/demo.gif, docs/map.png, docs/chat.png and docs/picker.png.
 """
 
 from __future__ import annotations
@@ -135,7 +135,7 @@ def main(out: str) -> None:
     w.resize(*SIZE)
     w.show()
     w.map.animation_ms = 700
-    w.set_model_status("ready", "Qwen ready")
+    w.set_model_status("ready", "Qwen3 4B ready")
 
     frames = Path(tempfile.mkdtemp(prefix="mindmap-demo-"))
     rec = Recorder(app, w, frames)
@@ -205,6 +205,22 @@ def main(out: str) -> None:
     w.chat.brief_card.toggle.setChecked(True)
     app.processEvents()
     w.grab().save(str(out_dir / "chat.png"))
+
+    # The model picker, on the Claude tab.
+    from mindmap.models import ModelSpec
+    from mindmap.ui import style
+    from mindmap.ui.model_picker import ModelPickerDialog
+
+    picker = ModelPickerDialog(
+        ModelSpec("anthropic", "claude-opus-5-5"),
+        get_key=lambda p: None, key_source=lambda p: None,
+        set_key=lambda *a: None, delete_key=lambda *a: None, list_models=lambda *a: [],
+    )
+    picker.setStyleSheet(style.stylesheet(style.LIGHT))
+    picker.resize(560, 380)
+    picker.show()
+    app.processEvents()
+    picker.grab().save(str(out_dir / "picker.png"))
 
     shutil.rmtree(frames)
     print(f"{gif} ({gif.stat().st_size // 1024} KB, {rec.n} frames)")
