@@ -47,3 +47,17 @@ def test_plain_store_is_not_seeded(tmp_path, monkeypatch):
     s = open_store(parse_args([]))
     assert s.sessions() == []
     s.close()
+
+
+def test_make_server(monkeypatch):
+    from mindmap import __main__ as m
+
+    assert m.make_server(parse_args(["--mock"])) is None
+    started = []
+    monkeypatch.setattr(m.ModelServer, "ensure_running", lambda self: started.append(1) or "started")
+    s = m.make_server(parse_args(["--no-server"]))
+    assert s is not None and started == []
+    s.close()
+    s = m.make_server(parse_args([]))
+    assert started == [1]
+    s.close()

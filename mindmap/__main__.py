@@ -1,4 +1,4 @@
-"""Entry point: python -m mindmap [--mock] [--demo] [--reset-demo]"""
+"""Entry point: python -m mindmap [--mock] [--demo] [--reset-demo] [--no-server]"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from .llm import DEFAULT_BASE_URL, LLMClient
+from .server import ModelServer
 from .store import Store
 from .ui.main_window import MainWindow
 
@@ -24,6 +25,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                    help="open the demo map (separate database, seeded on first use)")
     p.add_argument("--reset-demo", action="store_true",
                    help="wipe and re-seed the demo map (implies --demo)")
+    p.add_argument("--no-server", action="store_true",
+                   help="don't start llama-server; only use one that is already running")
     p.add_argument("--mock-delay", type=float, default=0.03,
                    help="seconds between mock tokens (default 0.03)")
     args = p.parse_args(argv)
@@ -59,22 +62,36 @@ def make_client(args: argparse.Namespace):
     return LLMClient(os.environ.get("MINDMAP_LLM_URL", DEFAULT_BASE_URL))
 
 
+def make_server(args: argparse.Namespace) -> ModelServer | None:
+    if args.mock:
+        return None
+    server = ModelServer()
+    if not args.no_server:
+        server.ensure_running()
+    return server
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     app = QApplication(sys.argv[:1])
     app.setApplicationName("Mind Map")
     store = open_store(args)
     client = make_client(args)
-    window = MainWindow(store, client)
-    if args.mock:
-        window.setWindowTitle("Mind Map — mock Qwen")
-    window.show()
-    window.raise_()
-    window.activateWindow()
-    code = app.exec()
-    client.close()
-    store.close()
-    return code
+    server = make_server(args)
+    try:
+        window = MainWindow(store, client, server)
+        if args.mock:
+            window.setWindowTitle("Mind Map — mock Qwen")
+            window.set_model_status("info", "Mock Qwen")
+        window.show()
+        window.raise_()
+        window.activateWindow()
+        return app.exec()
+    finally:
+        if server is not None:
+            server.close()  # stops llama-server only if we started it
+        client.close()
+        store.close()
 
 
 if __name__ == "__main__":
