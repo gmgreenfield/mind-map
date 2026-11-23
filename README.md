@@ -5,9 +5,10 @@
 <h1 align="center">Mind Map</h1>
 
 <p align="center">
-  <b>A local LLM chat where every conversation is a node on a 2D mind map.</b><br>
+  <b>An LLM chat where every conversation is a node on a 2D mind map.</b><br>
   Branch side topics into new chats, carry the context with an editable handoff brief,
-  and find your way back by where things are on the map.
+  and find your way back by where things are on the map. Run models locally on your Mac,
+  or use Claude or ChatGPT.
 </p>
 
 <p align="center">
@@ -30,26 +31,34 @@ spatially:
   **handoff brief** (goal, relevant context, open questions) from the current chat.
   You edit it, confirm, and the camera pivots to the new child chat.
 - **Children see only the brief**, not the parent's whole history. Each chat stays
-  focused, and context stays small, which suits a small local model.
+  focused and its context stays small, which keeps replies fast and cheap and suits
+  small local models.
 - **The map is the interface.** No sidebars, no chat list. Click a node to zoom into
   it, press Esc to zoom out, drag branches around, and move between connected chats
   with ⌘ + arrow keys.
-- **Your choice of model, per topic.** Pick one when a topic starts; its branches inherit
-  it, and you can switch any chat later:
-  - **Local** (default): [Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507),
-    Qwen3-30B-A3B, or any GGUF model on Hugging Face, run by
-    [llama.cpp](https://github.com/ggml-org/llama.cpp) on your Mac. Nothing leaves your machine.
-  - **Claude** or **ChatGPT** with your own API key (stored in the macOS Keychain).
+- **Any model, chosen per topic.** Pick one when a topic starts; its branches inherit
+  it, and you can switch any chat later. Mix them on one map, for example a private
+  local model for the main plan and Claude for one branch.
+  - **Local:** any GGUF model from Hugging Face, run on your Mac by
+    [llama.cpp](https://github.com/ggml-org/llama.cpp). Nothing leaves your machine.
+    The picker suggests a couple of Qwen3 sizes to start with.
+  - **Claude** or **ChatGPT** with your own API key, stored in the macOS Keychain.
 
 <p align="center">
   <img src="docs/map.png" width="49%" alt="The map with several branched chats">
   <img src="docs/chat.png" width="49%" alt="A branched chat showing the handoff brief">
 </p>
 
+<p align="center">
+  <img src="docs/picker.png" width="60%" alt="Choosing a model: local, Claude or ChatGPT">
+</p>
+
 ## Install
 
-**Requirements:** a Mac, about 3 GB of free disk space (the model is ~2.5 GB) and 8 GB+ RAM.
-It runs on the CPU, so Intel Macs work (tested on an Intel i7 with macOS 26). Apple Silicon should be faster.
+**Requirements:** a Mac. For local models you also need disk space and RAM to match the
+model you pick: the smallest suggested one is a ~2.5 GB download and runs in 8 GB of RAM.
+Local models run on the CPU, so Intel Macs work (tested on an Intel i7 with macOS 26);
+Apple Silicon is faster. Cloud models only need an API key.
 
 ### Download the app
 
@@ -58,7 +67,8 @@ From the [latest release](https://github.com/gmgreenfield/mind-map/releases/late
 and move **Mind Map.app** to Applications.
 
 The app isn't signed by Apple, so the first time, **right-click it → Open → Open**.
-On first launch it downloads the model (~2.5 GB) and then starts in a few seconds after that.
+The first time you chat with a local model, the app downloads it; after that it loads
+in seconds.
 
 ### Run from source
 
@@ -68,7 +78,8 @@ cd mind-map
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
-You also need `llama-server` from llama.cpp. Download the macOS build for your chip from the
+For local models you also need `llama-server` from llama.cpp (skip this if you only use
+Claude or ChatGPT). Download the macOS build for your chip from the
 [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases)
 (`llama-<build>-bin-macos-arm64.tar.gz` or `-x64`), then:
 
@@ -98,19 +109,19 @@ ln -sfn ~/.local/llama.cpp/llama-<build> ~/.local/llama.cpp/current
 ## How branching works
 
 ```
-Parent chat ──/branch food──▶ Qwen writes a brief ──▶ you edit it ──▶ child chat
-                                (from the transcript)                  (sees only the brief)
+Parent chat ──/branch food──▶ model writes a brief ──▶ you edit it ──▶ child chat
+                                 (from the transcript)                   (sees only the brief)
 ```
 
-The brief is generated from the parent chat, passed as a quoted transcript. With a 4B
-model, this works much more reliably than asking it to summarise its own chat turns,
-which sometimes made it reverse conclusions. Replies are capped and told to be brief,
-so a CPU-only Mac stays responsive.
+The brief is written by the parent chat's model from a quoted transcript of the chat.
+Small local models summarise much more reliably this way than when asked to summarise
+their own chat turns, which sometimes made them reverse conclusions. Local replies are
+capped and told to be brief, so a CPU-only Mac stays responsive.
 
 ## Development
 
 ```bash
-.venv/bin/pytest                         # ~140 tests, including UI tests (offscreen)
+.venv/bin/pytest                         # ~200 tests, including UI tests (offscreen)
 .venv/bin/python -m mindmap --mock --demo  # mock model + an example map
 scripts/build_app.sh                     # build dist/Mind Map.app
 .venv/bin/python scripts/make_demo.py docs # re-record the demo GIF
@@ -136,7 +147,10 @@ mindmap/
 ## Credits
 
 Built with [PySide6](https://doc.qt.io/qtforpython-6/), [llama.cpp](https://github.com/ggml-org/llama.cpp)
-(MIT) and [Qwen3](https://github.com/QwenLM/Qwen3) (Apache 2.0).
+(MIT), the [Anthropic](https://github.com/anthropics/anthropic-sdk-python) and
+[OpenAI](https://github.com/openai/openai-python) Python SDKs, and
+[keyring](https://github.com/jaraco/keyring). The suggested local models are
+[Qwen3](https://github.com/QwenLM/Qwen3) (Apache 2.0).
 
 ## License
 
