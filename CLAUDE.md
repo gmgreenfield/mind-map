@@ -37,7 +37,9 @@ Keep context small (server ctx 8192).
 - `mindmap/commands.py` — slash-command parsing
 - `mindmap/ui/` — PySide6: map view, chat view, brief dialog, main window
 - `tests/` — pytest (+ pytest-qt, offscreen) for all of the above
-- `scripts/serve.sh` — start llama-server with the Qwen model
+- `mindmap/server.py` — starts/watches/stops llama-server from inside the app
+- `scripts/serve.sh` — start llama-server by hand (dev)
+- `scripts/build_app.sh` — build `dist/Mind Map.app` (PyInstaller + bundled llama-server)
 
 ## Commands
 - Setup: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
@@ -46,6 +48,8 @@ Keep context small (server ctx 8192).
 - **App without a model:** `.venv/bin/python -m mindmap --mock --demo`
   (`--reset-demo` re-seeds; demo uses `demo.db`, never the real `mindmap.db`)
 - Tests: `.venv/bin/pytest`
+- **Build the Mac app:** `scripts/build_app.sh` → `dist/Mind Map.app` (~160 MB;
+  model not bundled, uses `~/.cache/huggingface`). Logs: `~/Library/Logs/MindMap/`
 
 ## Mock + demo
 - `mindmap/mock_llm.py` — `MockLLMClient`, same interface as `LLMClient`.
@@ -94,4 +98,11 @@ Keep context small (server ctx 8192).
   as chat turns, Qwen3-4B reversed stated conclusions (see commit 3fda70d).
 - [x] Replies capped at 512 tokens (`DEFAULT_MAX_TOKENS`) with a visible cut-off
   note; system prompt asks for brief, emoji-free answers. Same prompt: 92 s → 17 s.
-- [ ] Not yet: deleting/renaming nodes from the map, packaging as .app
+- [x] Chat restyle: bubbles, foldable brief card, code blocks with Copy,
+  thinking indicator, growing input, shared light/dark palette (`ui/style.py`)
+- [x] Rename/delete from right-click on a node or the chat ⋯ menu; delete
+  takes the whole subtree after confirming
+- [x] App starts its own llama-server if none is running, stops it on quit;
+  status label shows Starting/Loading/Ready/Stopped
+- [x] Packaged as `dist/Mind Map.app` (ad-hoc signed, works when opened from Finder)
+- Next ideas: reparent instead of deleting children; undo delete; notarized build
