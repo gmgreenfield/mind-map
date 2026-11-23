@@ -184,3 +184,104 @@ def test_empty_brief_does_not_create_branch(setup):
         FakeBriefDialog.brief_override = None
     assert len(store.sessions()) == 1
     assert "empty" in w.chat.status.text()
+
+
+# --- rename & delete -----------------------------------------------------------
+def test_rename_via_prompt_updates_store_map_and_breadcrumb(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    w.open_session(root.id)
+    w.ask_text = lambda title, label, text: ("  Better   name ", True)
+    assert w.rename_session(root.id)
+    assert store.get_session(root.id).title == "Better name"
+    assert w.map.nodes[root.id].title == "Better name"
+    assert "Better name" in w.chat.crumbs.text()
+
+
+def test_rename_cancel_or_blank_does_nothing(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    w.ask_text = lambda *a: ("x", False)
+    assert not w.rename_session(root.id)
+    assert not w.rename_session(root.id, "   ")
+    assert store.get_session(root.id).title == NEW_CHAT
+
+
+def test_delete_removes_subtree_after_confirm(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    a = w.create_branch(root.id, "a", "b")
+    a1 = w.create_branch(a.id, "a1", "b")
+    keep = w.create_branch(root.id, "keep", "b")
+    asked = []
+    w.confirm = lambda title, text: asked.append(text) or True
+    assert w.delete_session(a.id)
+    assert "the 1 branch below it" in asked[0]
+    ids = {s.id for s in store.sessions()}
+    assert ids == {root.id, keep.id}
+    assert set(w.map.nodes) == ids and len(w.map.edges) == 1
+    assert a1.id not in w.map.nodes
+
+
+def test_delete_cancelled_keeps_everything(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    w.create_branch(root.id, "a", "b")
+    w.confirm = lambda *a: False
+    assert not w.delete_session(root.id)
+    assert len(store.sessions()) == 2
+
+
+def test_deleting_open_session_moves_to_parent_chat(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    child = w.create_branch(root.id, "child", "b")
+    assert w.current_id == child.id and w.in_chat()
+    w.confirm = lambda *a: True
+    w.chat.deleteRequested.emit()
+    assert w.current_id == root.id and w.in_chat()
+    assert w.map.nodes[root.id].current
+
+
+def test_deleting_last_root_returns_to_empty_map(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    w.open_session(root.id)
+    w.confirm = lambda *a: True
+    assert w.delete_session(root.id)
+    assert store.sessions() == [] and w.current_id is None and not w.in_chat()
+    new = w.create_root(0, 0)
+    assert w.current_id == new.id
+
+
+def test_delete_while_reply_streaming_is_safe(qtbot):
+    import time
+
+    class SlowClient:
+        def stream_chat(self, messages, temperature=0.7):
+            for word in ["one ", "two ", "three"]:
+                time.sleep(0.05)
+                yield word
+
+    store = Store()
+    w = MainWindow(store, SlowClient())
+    w.map.animation_ms = 0
+    qtbot.addWidget(w)
+    root = store.sessions()[0]
+    w.open_session(root.id)
+    w.handle_input("hello")
+    w.confirm = lambda *a: True
+    assert w.delete_session(root.id)
+    qtbot.waitUntil(w.idle, timeout=3000)
+    assert store.sessions() == []
+    w.close()
+    store.close()
+
+
+def test_rename_from_chat_menu(setup):
+    w, store, _ = setup
+    root = store.sessions()[0]
+    w.open_session(root.id)
+    w.ask_text = lambda *a: ("From menu", True)
+    w.chat.rename_action.trigger()
+    assert store.get_session(root.id).title == "From menu"

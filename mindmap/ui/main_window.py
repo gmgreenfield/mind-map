@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QDialog, QMainWindow, QStackedWidget
+from PySide6.QtWidgets import (
+    QDialog,
+    QInputDialog,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QStackedWidget,
+)
 
 from .. import branching
 from ..commands import Command, CommandError, parse, unescape
@@ -29,6 +36,14 @@ class MainWindow(QMainWindow):
         self.workers: dict[int, StreamWorker] = {}
         self._background: set[StreamWorker] = set()
         self.brief_dialog_factory = BriefDialog
+        # Swappable in tests: (title, label, text) -> (text, ok) and (title, text) -> bool
+        self.ask_text = lambda title, label, text: QInputDialog.getText(
+            self, title, label, text=text
+        )
+        self.confirm = lambda title, text: (
+            QMessageBox.question(self, title, text, QMessageBox.Yes | QMessageBox.Cancel)
+            == QMessageBox.Yes
+        )
 
         self.map = MapView()
         self.chat = ChatView()
@@ -41,11 +56,14 @@ class MainWindow(QMainWindow):
         self.map.nodeActivated.connect(self.open_session)
         self.map.nodesMoved.connect(self._persist_positions)
         self.map.createRootRequested.connect(self.create_root)
+        self.map.nodeMenuRequested.connect(self._node_menu)
         self.chat.sendRequested.connect(self.handle_input)
         self.chat.backRequested.connect(self.back_to_map)
         self.chat.branchRequested.connect(self._branch_button)
         self.chat.sessionRequested.connect(self.pivot_to)
         self.chat.navigateRequested.connect(self.navigate)
+        self.chat.renameRequested.connect(lambda: self.rename_session(self.current_id))
+        self.chat.deleteRequested.connect(lambda: self.delete_session(self.current_id))
 
         if not self.store.sessions():
             self.store.create_session(NEW_CHAT, x=0, y=0)
@@ -132,6 +150,65 @@ class MainWindow(QMainWindow):
         self.pivot_to(child.id)
         return child
 
+    def _exists(self, sid: int) -> bool:
+        try:
+            self.store.get_session(sid)
+            return True
+        except KeyError:
+            return False
+
+    def _node_menu(self, sid: int, pos) -> None:
+        menu = QMenu(self)
+        menu.addAction("Open", lambda: self.open_session(sid))
+        menu.addAction("Rename…", lambda: self.rename_session(sid))
+        menu.addSeparator()
+        menu.addAction("Delete…", lambda: self.delete_session(sid))
+        menu.exec(pos)
+
+    def rename_session(self, sid: int | None, title: str | None = None) -> bool:
+        if sid is None:
+            return False
+        if title is None:
+            title, ok = self.ask_text("Rename", "Title:", self.store.get_session(sid).title)
+            if not ok:
+                return False
+        title = " ".join(title.split())
+        if not title:
+            return False
+        self.store.rename(sid, title)
+        self.map.set_title(sid, title)
+        if self.in_chat() and self.current_id is not None:
+            self.refresh_chat()  # breadcrumb may include it
+        return True
+
+    def delete_session(self, sid: int | None) -> bool:
+        """Delete a session and every branch below it, after confirming."""
+        if sid is None:
+            return False
+        session = self.store.get_session(sid)
+        ids = self.store.subtree_ids(sid)
+        below = len(ids) - 1
+        detail = f" and the {below} branch{'es' if below != 1 else ''} below it" if below else ""
+        if not self.confirm("Delete", f"Delete “{session.title}”{detail}? This can't be undone."):
+            return False
+
+        for i in ids:
+            worker = self.workers.pop(i, None)
+            if worker is not None:
+                worker.stop()
+            self.partials.pop(i, None)
+        self.store.delete_session(sid)
+        self.map.remove_nodes(ids)
+
+        if self.current_id in ids:
+            self.current_id = session.parent_id
+            self.map.set_current(self.current_id)
+            if self.current_id is not None and self.in_chat():
+                self._show_chat(self.current_id)
+            elif self.in_chat():
+                self.stack.setCurrentWidget(self.map)
+        return True
+
     def _persist_positions(self, moved: list) -> None:
         for sid, x, y in moved:
             self.store.set_position(sid, x, y)
@@ -197,6 +274,8 @@ class MainWindow(QMainWindow):
     def _finish_reply(self, sid: int, text: str) -> None:
         self.workers.pop(sid, None)
         self.partials.pop(sid, None)
+        if not self._exists(sid):  # deleted while Qwen was replying
+            return
         if text.strip():
             self.store.add_message(sid, "assistant", text.strip())
         self.map.set_busy(sid, False)
