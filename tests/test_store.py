@@ -95,3 +95,31 @@ def test_persists_to_file(tmp_path):
     s2 = Store(path)
     assert s2.get_session(sid).title == "keep"
     s2.close()
+
+
+def test_model_column_set_and_default(store):
+    s = store.create_session("s")
+    assert s.model is None
+    store.set_model(s.id, "anthropic:claude-opus-5-5")
+    assert store.get_session(s.id).model == "anthropic:claude-opus-5-5"
+    c = store.create_session("c", parent_id=s.id, model="openai:x")
+    assert store.children(s.id)[0].model == "openai:x" == c.model
+
+
+def test_migrates_old_database_without_model_column(tmp_path):
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript(
+        "CREATE TABLE sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER,"
+        " title TEXT NOT NULL, brief TEXT, x REAL NOT NULL DEFAULT 0, y REAL NOT NULL DEFAULT 0,"
+        " created_at REAL NOT NULL);"
+        "INSERT INTO sessions (title, created_at) VALUES ('legacy', 0);"
+    )
+    old.commit()
+    old.close()
+    s = Store(path)
+    (legacy,) = s.sessions()
+    assert legacy.title == "legacy" and legacy.model is None
+    s.set_model(legacy.id, "local:x:y")
+    assert s.get_session(legacy.id).model == "local:x:y"
+    s.close()

@@ -37,6 +37,7 @@ class Session:
     brief: str | None
     x: float
     y: float
+    model: str | None = None  # "provider:name"; None means the default model
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,13 @@ class Store:
         self.db = sqlite3.connect(str(path))
         self.db.execute("PRAGMA foreign_keys = ON")
         self.db.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(sessions)")}
+        if "model" not in cols:  # maps made before model choice existed
+            with self.db:
+                self.db.execute("ALTER TABLE sessions ADD COLUMN model TEXT")
 
     def close(self) -> None:
         self.db.close()
@@ -66,18 +74,19 @@ class Store:
         brief: str | None = None,
         x: float = 0.0,
         y: float = 0.0,
+        model: str | None = None,
     ) -> Session:
         with self.db:
             cur = self.db.execute(
-                "INSERT INTO sessions (parent_id, title, brief, x, y, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (parent_id, title, brief, x, y, time.time()),
+                "INSERT INTO sessions (parent_id, title, brief, x, y, model, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (parent_id, title, brief, x, y, model, time.time()),
             )
         return self.get_session(cur.lastrowid)
 
     def get_session(self, session_id: int) -> Session:
         row = self.db.execute(
-            "SELECT id, parent_id, title, brief, x, y FROM sessions WHERE id = ?",
+            "SELECT id, parent_id, title, brief, x, y, model FROM sessions WHERE id = ?",
             (session_id,),
         ).fetchone()
         if row is None:
@@ -86,13 +95,13 @@ class Store:
 
     def sessions(self) -> list[Session]:
         rows = self.db.execute(
-            "SELECT id, parent_id, title, brief, x, y FROM sessions ORDER BY id"
+            "SELECT id, parent_id, title, brief, x, y, model FROM sessions ORDER BY id"
         ).fetchall()
         return [Session(*r) for r in rows]
 
     def children(self, session_id: int) -> list[Session]:
         rows = self.db.execute(
-            "SELECT id, parent_id, title, brief, x, y FROM sessions"
+            "SELECT id, parent_id, title, brief, x, y, model FROM sessions"
             " WHERE parent_id = ? ORDER BY id",
             (session_id,),
         ).fetchall()
@@ -126,6 +135,12 @@ class Store:
         with self.db:
             self.db.execute(
                 "UPDATE sessions SET title = ? WHERE id = ?", (title, session_id)
+            )
+
+    def set_model(self, session_id: int, model: str | None) -> None:
+        with self.db:
+            self.db.execute(
+                "UPDATE sessions SET model = ? WHERE id = ?", (model, session_id)
             )
 
     def set_position(self, session_id: int, x: float, y: float) -> None:
